@@ -1,0 +1,12 @@
+{
+  "name": "03-color-cycler",
+  "tree": {
+    "$className": "DataModel",
+    "ServerScriptService": {
+      "$className": "ServerScriptService",
+      "ColorCycler": {
+        "$path": "src/server/ColorCycler.server.lua"
+      }
+    }
+  }
+}

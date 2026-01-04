@@ -1,0 +1,12 @@
+{
+  "name": "05-moving-platform",
+  "tree": {
+    "$className": "DataModel",
+    "ServerScriptService": {
+      "$className": "ServerScriptService",
+      "MovingPlatform": {
+        "$path": "src/server/MovingPlatform.server.lua"
+      }
+    }
+  }
+}

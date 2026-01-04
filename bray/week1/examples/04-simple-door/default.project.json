@@ -1,0 +1,12 @@
+{
+  "name": "04-simple-door",
+  "tree": {
+    "$className": "DataModel",
+    "ServerScriptService": {
+      "$className": "ServerScriptService",
+      "DoorScript": {
+        "$path": "src/server/DoorScript.server.lua"
+      }
+    }
+  }
+}

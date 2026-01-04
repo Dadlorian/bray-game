@@ -1,0 +1,12 @@
+{
+  "name": "02-part-manipulator",
+  "tree": {
+    "$className": "DataModel",
+    "ServerScriptService": {
+      "$className": "ServerScriptService",
+      "PartManipulator": {
+        "$path": "src/server/PartManipulator.server.lua"
+      }
+    }
+  }
+}

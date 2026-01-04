@@ -1,0 +1,21 @@
+{
+  "name": "01-hello-world",
+  "tree": {
+    "$className": "DataModel",
+    "ServerScriptService": {
+      "$className": "ServerScriptService",
+      "HelloWorld": {
+        "$path": "src/server/HelloWorld.server.lua"
+      }
+    },
+    "StarterPlayer": {
+      "$className": "StarterPlayer",
+      "StarterPlayerScripts": {
+        "$className": "StarterPlayerScripts",
+        "HelloWorld": {
+          "$path": "src/client/HelloWorld.client.lua"
+        }
+      }
+    }
+  }
+}
