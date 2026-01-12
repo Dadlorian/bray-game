@@ -12,7 +12,7 @@ if baseplate then
 	print("Found the Baseplate! Customizing it now...")
 
 	-- Now, let's change its properties.
-	baseplate.Color = Color3.fromRGB(255, 0, 100) -- A bright magenta color
+	baseplate.Color = Color3.fromRGB(0, 150, 255) -- A nice blue color
 	baseplate.Material = Enum.Material.Neon      -- Make it glow!
 	baseplate.Size = Vector3.new(1024, 2, 1024)   -- Make it bigger!
 
