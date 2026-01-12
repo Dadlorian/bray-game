@@ -1,27 +1,41 @@
 # Current Session
 
 ## Status
-**Session Started:** 2025-01-12
-**Focus:** Environment Setup for Game Development
+**Session:** 2025-01-12
+**Focus:** Elevating the Tutorial Game with Professional Assets
+
+## Where We Are
+- Basic sniper game is WORKING
+- Rojo connected and syncing
+- Ready to upgrade visuals with real 3D models
 
 ## Next Action
-- [ ] Open a new terminal and type `commands` to see all aliases
-- [ ] Run `serve` to start Rojo
-- [ ] Open Roblox Studio and connect via Plugins > Rojo > Connect
+**Phase 1, Step 1.1:** Open the Toolbox in Roblox Studio
 
-## Recent Decisions
-- Using simple one-word aliases (serve, build, game, board)
-- All project context lives in `.context/` folder
+1. In Studio menu: **View > Toolbox**
+2. A panel will open with search and model browsing
+3. Try searching "target" to see what's available
 
 ## Quick Reference
 
 ```
+tutorial  - Go to tutorial-game folder
 serve     - Start Rojo server
-build     - Build game file
-game      - Go to game folder
-board     - See work board
+board     - See full development board
 commands  - Show all commands
 ```
 
-## Notes
-Dad set up aliases to make development easy!
+## Today's Goal
+Complete **Phase 1: Master the Toolbox** - learn how to find, add, and manage 3D models from Roblox's Creator Store
+
+## Recent Decisions
+- Using Toolbox/Creator Store for models (safest, built-in)
+- Prioritize "Endorsed Models" (verified by Roblox)
+- Low poly models preferred for performance
+- Test after every single step
+
+## Tips for This Session
+- **Endorsed badge** = safe to use
+- Avoid models with lots of scripts
+- Simple meshes work best with existing code
+- If a model breaks shooting, try a different one
