@@ -36,6 +36,8 @@ local TargetHit = ReplicatedStorage:WaitForChild("Events"):WaitForChild("TargetH
 
 local BULLET_RANGE = 1000
 local kills = 0
+local totalPoints = 0  -- Tracks your total score!
+local pointsLabel = nil  -- Reference to update points display
 
 -- Zoom settings
 local NORMAL_FOV = 70
@@ -43,18 +45,18 @@ local ZOOMED_FOV = 20
 local isZoomed = false
 local isEquipped = false
 
--- Scope sway settings (breathing effect)
-local SWAY_AMOUNT = 0.15         -- How much the scope moves (in degrees) - gentle breathing
-local SWAY_SPEED = 1.5           -- How fast the breathing cycle is - slower, calmer
-local STEADY_SWAY = 0.01         -- Sway when holding breath (almost perfectly still!)
-local TIRED_SWAY = 0.4           -- Sway when out of breath (shaky but not crazy)
+-- Scope sway settings (breathing effect) - ONLY when zoomed!
+local SWAY_AMOUNT = 0.12         -- How much the scope moves (in degrees) - gentle breathing
+local SWAY_SPEED = 1.2           -- How fast the breathing cycle is - slower, calmer
+local STEADY_SWAY = 0.002        -- Sway when holding breath (SUPER steady - almost none!)
+local TIRED_SWAY = 0.3           -- Sway when out of breath
 
--- Breath holding settings
-local MAX_BREATH = 4             -- Seconds you can hold breath
-local BREATH_RECOVER_RATE = 0.5  -- How fast breath comes back (per second)
+-- Breath holding settings - LONGER breath time!
+local MAX_BREATH = 8             -- Seconds you can hold breath (doubled!)
+local BREATH_RECOVER_RATE = 1.0  -- How fast breath comes back (faster recovery!)
 local currentBreath = MAX_BREATH -- Current breath remaining
 local isHoldingBreath = false    -- Is the player holding shift?
-local currentSwayAmount = SWAY_AMOUNT  -- Current sway (changes smoothly with lerp!)
+local currentSwayAmount = 0      -- Start with NO sway (only sway when zoomed!)
 
 -- Sound IDs
 local GUNSHOT_SOUND = "rbxassetid://168143115"   -- Sniper shot
@@ -332,6 +334,17 @@ end
 local function showKillConfirmation(distance: number)
 	local playerGui = player:WaitForChild("PlayerGui")
 
+	-- Calculate points (more distance = more points!)
+	local points = math.floor(distance / 5) * 10
+
+	-- ADD TO TOTAL POINTS!
+	totalPoints = totalPoints + points
+
+	-- Update the points display at the top of screen
+	if pointsLabel then
+		pointsLabel.Text = "POINTS: " .. totalPoints
+	end
+
 	-- Create popup
 	local popup = Instance.new("ScreenGui")
 	popup.Name = "KillPopup"
@@ -361,7 +374,6 @@ local function showKillConfirmation(distance: number)
 	title.Parent = frame
 
 	-- Distance and points
-	local points = math.floor(distance / 5) * 10  -- More distance = more points!
 	local details = Instance.new("TextLabel")
 	details.Size = UDim2.new(1, 0, 0.5, 0)
 	details.Position = UDim2.new(0, 0, 0.5, 0)
@@ -403,22 +415,105 @@ local function showKillConfirmation(distance: number)
 end
 
 --[[
-	SLOW-MOTION BULLET CAM
+	BRAYDEN'S CUSTOM BULLET CAM
 
-	This is what makes sniper games feel EPIC!
-	When you hit a target, time slows down and you watch the bullet fly.
-
-	Why pro developers use this:
-	- Rewards the player for good shots
-	- Creates "wow" moments
-	- Makes long-distance shots feel satisfying
-	- Gives time to appreciate what happened
+	Settings chosen by Brayden:
+	- Camera: BEHIND the bullet (chase view)
+	- Speed: SUPER SLOW (dramatic)
+	- Effects: Fire trail + Smoke trail + Glowing trail
+	- Impact: Time freeze + Sparks + Big explosion
 ]]
 local bulletCamActive = false
 
+-- Create sparks that fly out on impact
+local function createSparks(position: Vector3)
+	for i = 1, 12 do
+		local spark = Instance.new("Part")
+		spark.Name = "Spark"
+		spark.Size = Vector3.new(0.15, 0.15, 0.15)
+		spark.Color = Color3.fromRGB(255, 200, 50)
+		spark.Material = Enum.Material.Neon
+		spark.CanCollide = false
+		spark.Anchored = false
+		spark.Position = position
+		spark.Parent = workspace
+
+		-- Random direction for each spark
+		local randomDir = Vector3.new(
+			math.random() - 0.5,
+			math.random() * 0.5 + 0.3,
+			math.random() - 0.5
+		).Unit * (math.random() * 30 + 20)
+
+		spark.AssemblyLinearVelocity = randomDir
+
+		-- Fade out and destroy
+		task.delay(0.3, function()
+			local fade = TweenService:Create(spark, TweenInfo.new(0.2), {Transparency = 1})
+			fade:Play()
+			fade.Completed:Connect(function()
+				spark:Destroy()
+			end)
+		end)
+	end
+end
+
+-- Create big explosion effect
+local function createExplosion(position: Vector3)
+	-- Main explosion flash
+	local explosion = Instance.new("Part")
+	explosion.Name = "Explosion"
+	explosion.Size = Vector3.new(1, 1, 1)
+	explosion.Position = position
+	explosion.Color = Color3.fromRGB(255, 150, 50)
+	explosion.Material = Enum.Material.Neon
+	explosion.Anchored = true
+	explosion.CanCollide = false
+	explosion.Shape = Enum.PartType.Ball
+	explosion.Parent = workspace
+
+	-- Add bright light
+	local light = Instance.new("PointLight")
+	light.Color = Color3.fromRGB(255, 200, 100)
+	light.Brightness = 5
+	light.Range = 30
+	light.Parent = explosion
+
+	-- Expand and fade
+	local expandTween = TweenService:Create(explosion, TweenInfo.new(0.3, Enum.EasingStyle.Quad), {
+		Size = Vector3.new(8, 8, 8),
+		Transparency = 1
+	})
+	expandTween:Play()
+	expandTween.Completed:Connect(function()
+		explosion:Destroy()
+	end)
+
+	-- Secondary orange ring
+	local ring = Instance.new("Part")
+	ring.Name = "ExplosionRing"
+	ring.Size = Vector3.new(0.5, 0.5, 0.5)
+	ring.Position = position
+	ring.Color = Color3.fromRGB(255, 100, 0)
+	ring.Material = Enum.Material.Neon
+	ring.Anchored = true
+	ring.CanCollide = false
+	ring.Shape = Enum.PartType.Ball
+	ring.Parent = workspace
+
+	local ringTween = TweenService:Create(ring, TweenInfo.new(0.4, Enum.EasingStyle.Quad), {
+		Size = Vector3.new(12, 12, 12),
+		Transparency = 1
+	})
+	ringTween:Play()
+	ringTween.Completed:Connect(function()
+		ring:Destroy()
+	end)
+end
+
 local function createBulletCam(startPos: Vector3, endPos: Vector3, hitTarget: boolean)
-	-- Only do slow-mo for target hits (not every shot)
 	local useBulletCam = hitTarget
+	local distance = (endPos - startPos).Magnitude
 
 	-- Create the bullet
 	local bullet = Instance.new("Part")
@@ -430,39 +525,96 @@ local function createBulletCam(startPos: Vector3, endPos: Vector3, hitTarget: bo
 	bullet.CastShadow = false
 	bullet.Parent = workspace
 
-	local distance = (endPos - startPos).Magnitude
-
-	if useBulletCam and distance > 30 and not bulletCamActive then
-		-- EPIC BULLET CAM MODE!
+	if useBulletCam and distance > 100 and not bulletCamActive then
+		-- BRAYDEN'S EPIC BULLET CAM!
 		bulletCamActive = true
 
-		-- Make bullet bigger and more visible for the cam
+		-- Make bullet visible
 		bullet.Size = Vector3.new(0.3, 0.3, 2.0)
 
-		-- Add trail effect
-		local trail = Instance.new("Trail")
+		-- Attachments for trails
 		local att0 = Instance.new("Attachment")
 		local att1 = Instance.new("Attachment")
 		att0.Position = Vector3.new(0, 0, -1)
 		att1.Position = Vector3.new(0, 0, 1)
 		att0.Parent = bullet
 		att1.Parent = bullet
-		trail.Attachment0 = att0
-		trail.Attachment1 = att1
-		trail.Color = ColorSequence.new(Color3.fromRGB(255, 200, 100), Color3.fromRGB(255, 100, 50))
-		trail.Transparency = NumberSequence.new(0, 1)
-		trail.Lifetime = 0.5
-		trail.WidthScale = NumberSequence.new(1, 0)
-		trail.Parent = bullet
 
-		-- Slower bullet for dramatic effect
-		local BULLET_SPEED = 150  -- Much slower for bullet cam!
+		-- TRAIL 1: FIRE TRAIL (orange/red)
+		local fireTrail = Instance.new("Trail")
+		fireTrail.Attachment0 = att0
+		fireTrail.Attachment1 = att1
+		fireTrail.Color = ColorSequence.new({
+			ColorSequenceKeypoint.new(0, Color3.fromRGB(255, 255, 200)),
+			ColorSequenceKeypoint.new(0.3, Color3.fromRGB(255, 150, 0)),
+			ColorSequenceKeypoint.new(1, Color3.fromRGB(255, 50, 0))
+		})
+		fireTrail.Transparency = NumberSequence.new({
+			NumberSequenceKeypoint.new(0, 0),
+			NumberSequenceKeypoint.new(0.5, 0.3),
+			NumberSequenceKeypoint.new(1, 1)
+		})
+		fireTrail.Lifetime = 1.0
+		fireTrail.WidthScale = NumberSequence.new({
+			NumberSequenceKeypoint.new(0, 1),
+			NumberSequenceKeypoint.new(1, 0)
+		})
+		fireTrail.Parent = bullet
+
+		-- TRAIL 2: SMOKE TRAIL (grey, wider)
+		local att2 = Instance.new("Attachment")
+		local att3 = Instance.new("Attachment")
+		att2.Position = Vector3.new(0, 0.1, -0.8)
+		att3.Position = Vector3.new(0, 0.1, 0.8)
+		att2.Parent = bullet
+		att3.Parent = bullet
+
+		local smokeTrail = Instance.new("Trail")
+		smokeTrail.Attachment0 = att2
+		smokeTrail.Attachment1 = att3
+		smokeTrail.Color = ColorSequence.new(Color3.fromRGB(100, 100, 100), Color3.fromRGB(50, 50, 50))
+		smokeTrail.Transparency = NumberSequence.new({
+			NumberSequenceKeypoint.new(0, 0.5),
+			NumberSequenceKeypoint.new(1, 1)
+		})
+		smokeTrail.Lifetime = 1.5
+		smokeTrail.WidthScale = NumberSequence.new({
+			NumberSequenceKeypoint.new(0, 0.5),
+			NumberSequenceKeypoint.new(0.5, 1.5),
+			NumberSequenceKeypoint.new(1, 0)
+		})
+		smokeTrail.Parent = bullet
+
+		-- TRAIL 3: GLOW TRAIL (bright yellow core)
+		local att4 = Instance.new("Attachment")
+		local att5 = Instance.new("Attachment")
+		att4.Position = Vector3.new(0, 0, -0.5)
+		att5.Position = Vector3.new(0, 0, 0.5)
+		att4.Parent = bullet
+		att5.Parent = bullet
+
+		local glowTrail = Instance.new("Trail")
+		glowTrail.Attachment0 = att4
+		glowTrail.Attachment1 = att5
+		glowTrail.Color = ColorSequence.new(Color3.fromRGB(255, 255, 150), Color3.fromRGB(255, 200, 50))
+		glowTrail.Transparency = NumberSequence.new(0, 1)
+		glowTrail.Lifetime = 0.4
+		glowTrail.WidthScale = NumberSequence.new(0.3, 0)
+		glowTrail.LightEmission = 1
+		glowTrail.Parent = bullet
+
+		-- Add point light to bullet (makes it glow!)
+		local bulletLight = Instance.new("PointLight")
+		bulletLight.Color = Color3.fromRGB(255, 200, 100)
+		bulletLight.Brightness = 2
+		bulletLight.Range = 10
+		bulletLight.Parent = bullet
+
+		-- SUPER SLOW speed (dramatic!)
+		local BULLET_SPEED = 80
 		local travelTime = distance / BULLET_SPEED
 
 		local startTime = tick()
-		local originalCameraType = camera.CameraType
-
-		-- Switch to following the bullet
 		camera.CameraType = Enum.CameraType.Scriptable
 
 		local connection
@@ -470,50 +622,41 @@ local function createBulletCam(startPos: Vector3, endPos: Vector3, hitTarget: bo
 			local elapsed = tick() - startTime
 			local t = math.min(elapsed / travelTime, 1)
 
-			-- Smooth easing (slow at start and end)
-			local smoothT = t * t * (3 - 2 * t)  -- Smoothstep function!
+			-- Smooth easing
+			local smoothT = t * t * (3 - 2 * t)
 
-			-- Lerp bullet position
+			-- Move bullet
 			local currentPos = startPos:Lerp(endPos, smoothT)
 			bullet.CFrame = CFrame.lookAt(currentPos, endPos) * CFrame.new(0, 0, -1)
 
-			-- Camera follows behind and slightly above bullet
-			local cameraOffset = (startPos - endPos).Unit * 8 + Vector3.new(0, 3, 0)
-			local targetCameraPos = currentPos + cameraOffset
-			camera.CFrame = CFrame.lookAt(targetCameraPos, currentPos)
+			-- CHASE CAMERA (behind the bullet!)
+			local bulletDirection = (endPos - startPos).Unit
+			local behindOffset = -bulletDirection * 6  -- 6 studs behind
+			local upOffset = Vector3.new(0, 2, 0)  -- 2 studs up
+			local cameraPos = currentPos + behindOffset + upOffset
+			camera.CFrame = CFrame.lookAt(cameraPos, currentPos + bulletDirection * 20)
 
+			-- When bullet reaches target
 			if t >= 1 then
 				connection:Disconnect()
+
+				-- TIME FREEZE! (pause for dramatic effect)
+				bullet.CFrame = CFrame.lookAt(endPos, endPos + bulletDirection)
+
+				task.wait(0.3)  -- Freeze for 0.3 seconds!
+
+				-- NOW the impact effects!
+				createSparks(endPos)
+				createExplosion(endPos)
+				screenShake(1.2, 0.25)
+
+				-- Clean up
+				bullet:Destroy()
 				bulletCamActive = false
 
-				-- Return camera to normal
+				-- Return camera
 				camera.CameraType = Enum.CameraType.Custom
 				player.CameraMode = Enum.CameraMode.LockFirstPerson
-
-				-- Impact effect!
-				screenShake(0.8, 0.15)
-
-				-- Destroy bullet with flash
-				local impactFlash = Instance.new("Part")
-				impactFlash.Size = Vector3.new(2, 2, 2)
-				impactFlash.Position = endPos
-				impactFlash.Color = Color3.fromRGB(255, 255, 200)
-				impactFlash.Material = Enum.Material.Neon
-				impactFlash.Anchored = true
-				impactFlash.CanCollide = false
-				impactFlash.Shape = Enum.PartType.Ball
-				impactFlash.Parent = workspace
-
-				local flashTween = TweenService:Create(impactFlash, TweenInfo.new(0.2), {
-					Size = Vector3.new(4, 4, 4),
-					Transparency = 1
-				})
-				flashTween:Play()
-				flashTween.Completed:Connect(function()
-					impactFlash:Destroy()
-				end)
-
-				bullet:Destroy()
 			end
 		end)
 	else
@@ -544,24 +687,24 @@ local function createBulletCam(startPos: Vector3, endPos: Vector3, hitTarget: bo
 	end
 end
 
--- Create the kill counter GUI
+-- Create the score display GUI (KILLS and POINTS at top!)
 local function createKillCounter()
 	local playerGui = player:WaitForChild("PlayerGui")
 
-	if playerGui:FindFirstChild("KillCounter") then
-		return playerGui.KillCounter.Frame.KillLabel
+	if playerGui:FindFirstChild("ScoreDisplay") then
+		return playerGui.ScoreDisplay.Frame.KillLabel, playerGui.ScoreDisplay.Frame.PointsLabel
 	end
 
 	local screenGui = Instance.new("ScreenGui")
-	screenGui.Name = "KillCounter"
+	screenGui.Name = "ScoreDisplay"
 	screenGui.Parent = playerGui
 
 	local frame = Instance.new("Frame")
 	frame.Name = "Frame"
-	frame.Size = UDim2.new(0, 200, 0, 60)
+	frame.Size = UDim2.new(0, 250, 0, 80)
 	frame.Position = UDim2.new(0, 20, 0, 20)
 	frame.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
-	frame.BackgroundTransparency = 0.5
+	frame.BackgroundTransparency = 0.4
 	frame.BorderSizePixel = 0
 	frame.Parent = screenGui
 
@@ -569,26 +712,38 @@ local function createKillCounter()
 	corner.CornerRadius = UDim.new(0, 10)
 	corner.Parent = frame
 
-	local label = Instance.new("TextLabel")
-	label.Name = "KillLabel"
-	label.Size = UDim2.new(1, 0, 1, 0)
-	label.BackgroundTransparency = 1
-	label.Text = "KILLS: 0"
-	label.TextColor3 = Color3.fromRGB(255, 50, 50)
-	label.TextSize = 32
-	label.Font = Enum.Font.GothamBold
-	label.Parent = frame
+	-- KILLS label (top)
+	local killLabel = Instance.new("TextLabel")
+	killLabel.Name = "KillLabel"
+	killLabel.Size = UDim2.new(1, 0, 0.5, 0)
+	killLabel.Position = UDim2.new(0, 0, 0, 0)
+	killLabel.BackgroundTransparency = 1
+	killLabel.Text = "KILLS: 0"
+	killLabel.TextColor3 = Color3.fromRGB(255, 50, 50)
+	killLabel.TextSize = 28
+	killLabel.Font = Enum.Font.GothamBold
+	killLabel.Parent = frame
 
-	return label
+	-- POINTS label (bottom)
+	local ptsLabel = Instance.new("TextLabel")
+	ptsLabel.Name = "PointsLabel"
+	ptsLabel.Size = UDim2.new(1, 0, 0.5, 0)
+	ptsLabel.Position = UDim2.new(0, 0, 0.5, 0)
+	ptsLabel.BackgroundTransparency = 1
+	ptsLabel.Text = "POINTS: 0"
+	ptsLabel.TextColor3 = Color3.fromRGB(255, 200, 50)
+	ptsLabel.TextSize = 24
+	ptsLabel.Font = Enum.Font.GothamBold
+	ptsLabel.Parent = frame
+
+	pointsLabel = ptsLabel
+	return killLabel
 end
 
 --[[
-	SCOPE OVERLAY
+	SCOPE OVERLAY - SUPER CLEAN VERSION
 
-	Creates a realistic sniper scope view with:
-	- Black vignette around edges (like looking through a tube)
-	- Crosshairs with mil-dots for range finding
-	- Scope ring around the view
+	No weird images - just clean black border and crosshairs!
 ]]
 local crosshairGui = nil
 local function createScopeOverlay()
@@ -602,153 +757,67 @@ local function createScopeOverlay()
 	screenGui.Name = "ScopeOverlay"
 	screenGui.Enabled = false
 	screenGui.IgnoreGuiInset = true
-	screenGui.DisplayOrder = 100  -- Show on top
+	screenGui.DisplayOrder = 100
 	screenGui.Parent = playerGui
 
-	-- Scope colors
 	local scopeBlack = Color3.fromRGB(0, 0, 0)
-	local reticleColor = Color3.fromRGB(0, 0, 0)  -- Black crosshairs
 	local reticleThickness = 2
 
-	-- Dark overlay for the edges (vignette effect)
-	-- Left black bar
+	-- Just simple black bars on left and right (no weird image!)
 	local leftBar = Instance.new("Frame")
-	leftBar.Name = "LeftBar"
-	leftBar.Size = UDim2.new(0.25, 0, 1, 0)
+	leftBar.Size = UDim2.new(0.2, 0, 1, 0)
 	leftBar.Position = UDim2.new(0, 0, 0, 0)
 	leftBar.BackgroundColor3 = scopeBlack
 	leftBar.BorderSizePixel = 0
 	leftBar.Parent = screenGui
 
-	-- Right black bar
 	local rightBar = Instance.new("Frame")
-	rightBar.Name = "RightBar"
-	rightBar.Size = UDim2.new(0.25, 0, 1, 0)
-	rightBar.Position = UDim2.new(0.75, 0, 0, 0)
+	rightBar.Size = UDim2.new(0.2, 0, 1, 0)
+	rightBar.Position = UDim2.new(0.8, 0, 0, 0)
 	rightBar.BackgroundColor3 = scopeBlack
 	rightBar.BorderSizePixel = 0
 	rightBar.Parent = screenGui
 
-	-- Top black bar (above scope circle)
-	local topBar = Instance.new("Frame")
-	topBar.Name = "TopBar"
-	topBar.Size = UDim2.new(0.5, 0, 0.15, 0)
-	topBar.Position = UDim2.new(0.25, 0, 0, 0)
-	topBar.BackgroundColor3 = scopeBlack
-	topBar.BorderSizePixel = 0
-	topBar.Parent = screenGui
-
-	-- Bottom black bar (below scope circle)
-	local bottomBar = Instance.new("Frame")
-	bottomBar.Name = "BottomBar"
-	bottomBar.Size = UDim2.new(0.5, 0, 0.15, 0)
-	bottomBar.Position = UDim2.new(0.25, 0, 0.85, 0)
-	bottomBar.BackgroundColor3 = scopeBlack
-	bottomBar.BorderSizePixel = 0
-	bottomBar.Parent = screenGui
-
-	-- Corner pieces to make it more circular
-	local corners = {
-		{pos = UDim2.new(0.25, 0, 0.15, 0), size = UDim2.new(0.08, 0, 0.12, 0)},
-		{pos = UDim2.new(0.67, 0, 0.15, 0), size = UDim2.new(0.08, 0, 0.12, 0)},
-		{pos = UDim2.new(0.25, 0, 0.73, 0), size = UDim2.new(0.08, 0, 0.12, 0)},
-		{pos = UDim2.new(0.67, 0, 0.73, 0), size = UDim2.new(0.08, 0, 0.12, 0)},
-	}
-	for i, corner in ipairs(corners) do
-		local c = Instance.new("Frame")
-		c.Name = "Corner" .. i
-		c.Size = corner.size
-		c.Position = corner.pos
-		c.BackgroundColor3 = scopeBlack
-		c.BorderSizePixel = 0
-		c.Parent = screenGui
-	end
-
-	-- Scope ring (circular border)
-	local scopeRing = Instance.new("ImageLabel")
-	scopeRing.Name = "ScopeRing"
-	scopeRing.Size = UDim2.new(0.5, 0, 0.7, 0)
-	scopeRing.Position = UDim2.new(0.25, 0, 0.15, 0)
-	scopeRing.BackgroundTransparency = 1
-	scopeRing.Image = "rbxassetid://3570695787"  -- Circle image
-	scopeRing.ImageColor3 = Color3.fromRGB(30, 30, 30)
-	scopeRing.ImageTransparency = 0.3
-	scopeRing.ScaleType = Enum.ScaleType.Fit
-	scopeRing.Parent = screenGui
-
-	-- CROSSHAIRS (the aiming reticle)
-	-- Main horizontal line (left side)
+	-- SIMPLE CROSSHAIRS
 	local hLeft = Instance.new("Frame")
-	hLeft.Name = "CrosshairLeft"
 	hLeft.Size = UDim2.new(0.15, 0, 0, reticleThickness)
-	hLeft.Position = UDim2.new(0.28, 0, 0.5, -reticleThickness/2)
-	hLeft.BackgroundColor3 = reticleColor
+	hLeft.Position = UDim2.new(0.22, 0, 0.5, -reticleThickness/2)
+	hLeft.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
 	hLeft.BorderSizePixel = 0
 	hLeft.Parent = screenGui
 
-	-- Main horizontal line (right side)
 	local hRight = Instance.new("Frame")
-	hRight.Name = "CrosshairRight"
 	hRight.Size = UDim2.new(0.15, 0, 0, reticleThickness)
-	hRight.Position = UDim2.new(0.57, 0, 0.5, -reticleThickness/2)
-	hRight.BackgroundColor3 = reticleColor
+	hRight.Position = UDim2.new(0.63, 0, 0.5, -reticleThickness/2)
+	hRight.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
 	hRight.BorderSizePixel = 0
 	hRight.Parent = screenGui
 
-	-- Main vertical line (top)
 	local vTop = Instance.new("Frame")
-	vTop.Name = "CrosshairTop"
-	vTop.Size = UDim2.new(0, reticleThickness, 0.12, 0)
-	vTop.Position = UDim2.new(0.5, -reticleThickness/2, 0.2, 0)
-	vTop.BackgroundColor3 = reticleColor
+	vTop.Size = UDim2.new(0, reticleThickness, 0.2, 0)
+	vTop.Position = UDim2.new(0.5, -reticleThickness/2, 0.15, 0)
+	vTop.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
 	vTop.BorderSizePixel = 0
 	vTop.Parent = screenGui
 
-	-- Main vertical line (bottom) - longer for bullet drop reference
 	local vBottom = Instance.new("Frame")
-	vBottom.Name = "CrosshairBottom"
-	vBottom.Size = UDim2.new(0, reticleThickness, 0.25, 0)
-	vBottom.Position = UDim2.new(0.5, -reticleThickness/2, 0.52, 0)
-	vBottom.BackgroundColor3 = reticleColor
+	vBottom.Size = UDim2.new(0, reticleThickness, 0.2, 0)
+	vBottom.Position = UDim2.new(0.5, -reticleThickness/2, 0.65, 0)
+	vBottom.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
 	vBottom.BorderSizePixel = 0
 	vBottom.Parent = screenGui
 
-	-- Center dot (where you aim!)
+	-- RED CENTER DOT
 	local centerDot = Instance.new("Frame")
-	centerDot.Name = "CenterDot"
-	centerDot.Size = UDim2.new(0, 6, 0, 6)
-	centerDot.Position = UDim2.new(0.5, -3, 0.5, -3)
-	centerDot.BackgroundColor3 = Color3.fromRGB(255, 0, 0)  -- Red center dot!
+	centerDot.Size = UDim2.new(0, 8, 0, 8)
+	centerDot.Position = UDim2.new(0.5, -4, 0.5, -4)
+	centerDot.BackgroundColor3 = Color3.fromRGB(255, 0, 0)
 	centerDot.BorderSizePixel = 0
 	centerDot.Parent = screenGui
 
 	local dotCorner = Instance.new("UICorner")
-	dotCorner.CornerRadius = UDim.new(1, 0)  -- Make it circular
+	dotCorner.CornerRadius = UDim.new(1, 0)
 	dotCorner.Parent = centerDot
-
-	-- Mil-dots on vertical line (for range estimation)
-	local milDotPositions = {0.58, 0.64, 0.70}
-	for i, yPos in ipairs(milDotPositions) do
-		local milDot = Instance.new("Frame")
-		milDot.Name = "MilDot" .. i
-		milDot.Size = UDim2.new(0, 8, 0, 2)
-		milDot.Position = UDim2.new(0.5, -4, yPos, 0)
-		milDot.BackgroundColor3 = reticleColor
-		milDot.BorderSizePixel = 0
-		milDot.Parent = screenGui
-	end
-
-	-- Small tick marks on horizontal lines
-	local tickPositions = {0.32, 0.36, 0.40, 0.60, 0.64, 0.68}
-	for i, xPos in ipairs(tickPositions) do
-		local tick = Instance.new("Frame")
-		tick.Name = "Tick" .. i
-		tick.Size = UDim2.new(0, 2, 0, 6)
-		tick.Position = UDim2.new(xPos, -1, 0.5, -3)
-		tick.BackgroundColor3 = reticleColor
-		tick.BorderSizePixel = 0
-		tick.Parent = screenGui
-	end
 
 	return screenGui
 end
@@ -814,14 +883,24 @@ end
 breathMeterGui = createBreathMeter()
 
 -- Zoom function
--- Hide/show gun parts (when looking through scope, hide the gun)
-local function setGunVisible(visible: boolean)
+-- Hide/show gun parts (when looking through scope, show just the barrel tip!)
+local function setGunVisible(visible: boolean, showBarrelOnly: boolean)
 	for _, part in tool:GetChildren() do
 		if part:IsA("Part") then
-			part.Transparency = visible and 0 or 1
-			-- Keep glass parts semi-transparent
-			if part.Material == Enum.Material.Glass then
-				part.Transparency = visible and 0.4 or 1
+			-- When zoomed (showBarrelOnly = true), only show barrel and muzzle
+			if showBarrelOnly then
+				if part.Name == "Barrel" or part.Name == "Muzzle" then
+					part.Transparency = 0  -- Show the barrel tip!
+				else
+					part.Transparency = 1  -- Hide other parts
+				end
+			else
+				-- Normal mode - show everything
+				part.Transparency = visible and 0 or 1
+				-- Keep glass parts semi-transparent
+				if part.Material == Enum.Material.Glass then
+					part.Transparency = visible and 0.4 or 1
+				end
 			end
 		end
 	end
@@ -841,8 +920,12 @@ local function setZoom(zoomed: boolean)
 		player.CameraMode = Enum.CameraMode.Classic
 	end
 
-	-- Hide gun when looking through scope (you're looking THROUGH it!)
-	setGunVisible(not zoomed)
+	-- When zoomed, show only the barrel tip (so you can see where you're aiming!)
+	if zoomed then
+		setGunVisible(false, true)  -- Show barrel only
+	else
+		setGunVisible(true, false)  -- Show full gun
+	end
 
 	-- Smooth zoom animation
 	local tweenInfo = TweenInfo.new(0.15, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)

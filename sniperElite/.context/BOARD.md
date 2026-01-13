@@ -214,6 +214,22 @@ Phase 1 (Toolbox) ──┬──> Phase 2 (Targets)
 - [x] Targets shootable (Part-based)
 - [x] Development board created with phases
 
+### Session 2026-01-13 (Brayden + Dad)
+- [x] Learned about Map function and Lerp (smooth transitions)
+- [x] Added scope sway/breathing system (Hold Shift = steady)
+- [x] Created visible sniper rifle model (Body, Barrel, Scope, etc.)
+- [x] Added bullet tracer with muzzle flash
+- [x] Added screen shake for recoil feel
+- [x] Added points system (KILLS + POINTS display)
+- [x] Added kill confirmation popup (distance + points)
+- [x] **Brayden designed custom bullet cam!**
+  - Chase camera (behind bullet)
+  - Super slow dramatic speed
+  - Fire + Smoke + Glow trails
+  - Time freeze + Sparks + Explosion on impact
+- [x] Created trusted GitHub repos document
+- [x] Learned about Toolbox safety (backdoors, trusted sources)
+
 ---
 
 ## Notes

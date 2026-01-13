@@ -1,41 +1,55 @@
 # Current Session
 
 ## Status
-**Session:** 2025-01-12
-**Focus:** Elevating the Tutorial Game with Professional Assets
+**Session:** 2026-01-13
+**Focus:** Added Pro Sniper Features + Brayden's Custom Bullet Cam
 
 ## Where We Are
-- Basic sniper game is WORKING
-- Rojo connected and syncing
-- Ready to upgrade visuals with real 3D models
+- Sniper game has MAJOR upgrades!
+- Custom bullet cam designed by Brayden
+- Points system working
+- All code in `tutorial-game/src/tools/SniperRifle.client.luau`
 
-## Next Action
-**Phase 1, Step 1.1:** Open the Toolbox in Roblox Studio
+## What We Built This Session
 
-1. In Studio menu: **View > Toolbox**
-2. A panel will open with search and model browsing
-3. Try searching "target" to see what's available
+### Features Added:
+1. **Lerp (Linear Interpolation)** - Smooth transitions
+2. **Scope Sway/Breathing** - Hold Shift to steady (8 sec breath)
+3. **Visible Sniper Rifle** - Full gun model with parts
+4. **Bullet Tracer** - See bullets fly
+5. **Muzzle Flash** - With light effect
+6. **Screen Shake** - Recoil feel
+7. **Points System** - Tracks score at top of screen
+8. **Kill Confirmation** - Popup showing distance + points
 
-## Quick Reference
+### Brayden's Custom Bullet Cam (100+ stud shots):
+- Chase camera (behind bullet)
+- Super slow speed (dramatic)
+- Triple trails: Fire + Smoke + Glow
+- Time freeze on impact (0.3 sec pause)
+- Sparks flying out
+- Big explosion effect
 
+## Next Session - Pick Up Here:
+1. Test all the new features in game
+2. Adjust bullet cam if needed
+3. Continue Phase 1 (Toolbox exploration)
+4. Add real target models from Toolbox
+
+## Files Changed:
+- `tutorial-game/src/tools/SniperRifle.client.luau` - All features
+- `tutorial-game/default.project.json` - Tool Handle
+- `.context/details/2026-01-12-trusted-github-repositories.md` - New doc
+
+## What Brayden Learned:
+- Map function (converting ranges)
+- Lerp (smooth movement)
+- "Game juice" (pro developer effects)
+- How to design like a game dev (answered bullet cam questions)
+- Toolbox safety + trusted GitHub sources
+
+## Quick Commands
 ```
-tutorial  - Go to tutorial-game folder
 serve     - Start Rojo server
-board     - See full development board
-commands  - Show all commands
+board     - See development board
 ```
-
-## Today's Goal
-Complete **Phase 1: Master the Toolbox** - learn how to find, add, and manage 3D models from Roblox's Creator Store
-
-## Recent Decisions
-- Using Toolbox/Creator Store for models (safest, built-in)
-- Prioritize "Endorsed Models" (verified by Roblox)
-- Low poly models preferred for performance
-- Test after every single step
-
-## Tips for This Session
-- **Endorsed badge** = safe to use
-- Avoid models with lots of scripts
-- Simple meshes work best with existing code
-- If a model breaks shooting, try a different one
