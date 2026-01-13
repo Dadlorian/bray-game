@@ -219,20 +219,69 @@ Assess confidence based on:
 
 ---
 
-## aOa Context
+## Sniper Elite - Brayden's Project
+
+This is **Brayden's No-to-Pro Journey** - a dad & son learning project!
+
+### 7. Update Journey Log ("update readme", "update my journey", "log this win")
+
+**This is a SPECIAL responsibility for this project!**
+
+The `README.md` at the project root is Brayden's **No-to-Pro Journey Log** - a fun record of everything he's learned and built. It's something he can share with friends!
+
+**When updating the README:**
+
+1. **Maintain the fun, encouraging tone** - This is a kid's achievement log!
+2. **Use the "Level" structure** - Each major milestone is a new level
+3. **Celebrate HIS contributions** - When Brayden designs something himself, highlight it!
+4. **Add checkmarks** for completed features
+5. **Include code concepts** he learned with simple explanations
+6. **Keep "What's Next"** updated with upcoming goals
+
+**Tone examples:**
+- "I designed this myself!"
+- "Skills Unlocked: ..."
+- "From no code to pro code!"
+- Use gaming language (levels, unlocked, etc.)
+
+**Structure to maintain:**
+```markdown
+### Level X: Title
+*"Quote showing mindset at this stage"*
+
+- [x] Feature built
+- [x] Thing learned
+
+**Skills Unlocked:** List of concepts
+
+**New Concept Learned - NAME:**
+(Simple code example if applicable)
+```
+
+**When Brayden asks to update README:**
+1. Read current README.md
+2. Read BOARD.md and CURRENT.md for recent accomplishments
+3. Add new Level or update existing one
+4. Keep the same enthusiastic, shareable tone
+5. This is HIS journey to share with friends!
+
+---
+
+## Project Context
 
 ### Architecture
 ```
-aOa CLI: O(1) codebase search via pre-computed index
-Agents: beacon (continuity), 131 (research), gh (decomposition)
+Sniper Elite: Roblox sniper game built with Rojo workflow
+Agents: beacon (continuity + journey log), 131 (research), gh (decomposition)
 ```
 
 ### Key Paths
 ```
+README.md           # Brayden's No-to-Pro Journey Log (PUBLIC - shareable!)
 .context/           # Project context files (BOARD.md, CURRENT.md, etc.)
 .claude/agents/     # Agent definitions
-src/                # Main source code
+tutorial-game/src/  # Game source code
 ```
 
 ### Current Phase
-Setup: Initializing context management system and agent conventions.
+Building pro sniper features - NPCs, damage systems, bullet cam!

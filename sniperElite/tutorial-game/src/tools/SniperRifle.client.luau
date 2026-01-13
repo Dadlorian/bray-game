@@ -34,6 +34,96 @@ local camera = workspace.CurrentCamera
 
 local TargetHit = ReplicatedStorage:WaitForChild("Events"):WaitForChild("TargetHit")
 
+--[[
+	DAMAGE NUMBER POPUP
+
+	Shows floating damage numbers when you hit an enemy.
+	- Yellow for normal hits
+	- RED + bigger for HEADSHOTS!
+	- Floats up and fades out
+]]
+local function showDamageNumber(position: Vector3, damage: number, isHeadshot: boolean)
+	-- Create a BillboardGui at the hit position
+	local part = Instance.new("Part")
+	part.Name = "DamageAnchor"
+	part.Size = Vector3.new(0.1, 0.1, 0.1)
+	part.Position = position
+	part.Anchored = true
+	part.CanCollide = false
+	part.Transparency = 1
+	part.Parent = workspace
+
+	local billboard = Instance.new("BillboardGui")
+	billboard.Name = "DamageNumber"
+	billboard.Size = UDim2.new(0, 100, 0, 50)
+	billboard.StudsOffset = Vector3.new(0, 0, 0)
+	billboard.AlwaysOnTop = true
+	billboard.Parent = part
+
+	-- Damage text
+	local damageLabel = Instance.new("TextLabel")
+	damageLabel.Size = UDim2.new(1, 0, 1, 0)
+	damageLabel.BackgroundTransparency = 1
+	damageLabel.Font = Enum.Font.GothamBold
+	damageLabel.TextScaled = false
+	damageLabel.Parent = billboard
+
+	if isHeadshot then
+		-- HEADSHOT! Big red text with skull
+		damageLabel.Text = "💀 " .. damage
+		damageLabel.TextColor3 = Color3.fromRGB(255, 50, 50)
+		damageLabel.TextSize = 32
+		damageLabel.TextStrokeColor3 = Color3.fromRGB(100, 0, 0)
+		damageLabel.TextStrokeTransparency = 0
+	else
+		-- Normal hit - yellow
+		damageLabel.Text = "-" .. damage
+		damageLabel.TextColor3 = Color3.fromRGB(255, 220, 50)
+		damageLabel.TextSize = 24
+		damageLabel.TextStrokeColor3 = Color3.fromRGB(100, 80, 0)
+		damageLabel.TextStrokeTransparency = 0.3
+	end
+
+	-- Animate: float up and fade out
+	local startY = billboard.StudsOffset.Y
+	local floatTween = TweenService:Create(billboard, TweenInfo.new(1, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+		StudsOffset = Vector3.new(0, startY + 3, 0)
+	})
+	local fadeTween = TweenService:Create(damageLabel, TweenInfo.new(1), {
+		TextTransparency = 1,
+		TextStrokeTransparency = 1
+	})
+
+	floatTween:Play()
+	fadeTween:Play()
+
+	-- Clean up after animation
+	fadeTween.Completed:Connect(function()
+		part:Destroy()
+	end)
+end
+
+-- Listen for damage feedback from server
+TargetHit.OnClientEvent:Connect(function(damageInfo)
+	if damageInfo and damageInfo.damage then
+		showDamageNumber(damageInfo.position, damageInfo.damage, damageInfo.isHeadshot)
+
+		-- Play extra sound for headshots
+		if damageInfo.isHeadshot then
+			-- Satisfying headshot sound (reuse hit sound but louder)
+			local headshotSound = Instance.new("Sound")
+			headshotSound.SoundId = "rbxassetid://166221646"
+			headshotSound.Volume = 1
+			headshotSound.PlaybackSpeed = 1.5  -- Higher pitch
+			headshotSound.Parent = player:WaitForChild("PlayerGui")
+			headshotSound:Play()
+			headshotSound.Ended:Connect(function()
+				headshotSound:Destroy()
+			end)
+		end
+	end
+end)
+
 local BULLET_RANGE = 1000
 local kills = 0
 local totalPoints = 0  -- Tracks your total score!
@@ -511,7 +601,7 @@ local function createExplosion(position: Vector3)
 	end)
 end
 
-local function createBulletCam(startPos: Vector3, endPos: Vector3, hitTarget: boolean)
+local function createBulletCam(startPos: Vector3, endPos: Vector3, hitTarget: boolean, onImpact: (() -> ())?)
 	local useBulletCam = hitTarget
 	local distance = (endPos - startPos).Magnitude
 
@@ -528,6 +618,17 @@ local function createBulletCam(startPos: Vector3, endPos: Vector3, hitTarget: bo
 	if useBulletCam and distance > 100 and not bulletCamActive then
 		-- BRAYDEN'S EPIC BULLET CAM!
 		bulletCamActive = true
+
+		-- UNZOOM the camera so we can see the whole scene!
+		-- Reset FOV to normal (no scope view)
+		camera.FieldOfView = NORMAL_FOV
+		-- Hide the scope overlay during bullet cam
+		if crosshairGui then
+			crosshairGui.Enabled = false
+		end
+		if breathMeterGui then
+			breathMeterGui.Enabled = false
+		end
 
 		-- Make bullet visible
 		bullet.Size = Vector3.new(0.3, 0.3, 2.0)
@@ -629,12 +730,21 @@ local function createBulletCam(startPos: Vector3, endPos: Vector3, hitTarget: bo
 			local currentPos = startPos:Lerp(endPos, smoothT)
 			bullet.CFrame = CFrame.lookAt(currentPos, endPos) * CFrame.new(0, 0, -1)
 
-			-- CHASE CAMERA (behind the bullet!)
+			-- CINEMATIC CAMERA - zoomed out to see the whole journey!
+			-- Camera sits to the side and above, watching bullet fly toward target
 			local bulletDirection = (endPos - startPos).Unit
-			local behindOffset = -bulletDirection * 6  -- 6 studs behind
-			local upOffset = Vector3.new(0, 2, 0)  -- 2 studs up
-			local cameraPos = currentPos + behindOffset + upOffset
-			camera.CFrame = CFrame.lookAt(cameraPos, currentPos + bulletDirection * 20)
+			local rightDirection = bulletDirection:Cross(Vector3.new(0, 1, 0)).Unit
+
+			-- Start far back, move closer as bullet travels
+			local cameraDistance = lerp(25, 12, smoothT)  -- Starts 25 studs away, ends 12
+			local cameraHeight = lerp(8, 4, smoothT)      -- Starts 8 studs up, ends 4
+			local sideOffset = rightDirection * 8         -- 8 studs to the side
+
+			local cameraPos = currentPos + (-bulletDirection * cameraDistance) + sideOffset + Vector3.new(0, cameraHeight, 0)
+
+			-- Look slightly ahead of the bullet (toward the target)
+			local lookTarget = currentPos:Lerp(endPos, 0.3)
+			camera.CFrame = CFrame.lookAt(cameraPos, lookTarget)
 
 			-- When bullet reaches target
 			if t >= 1 then
@@ -650,6 +760,11 @@ local function createBulletCam(startPos: Vector3, endPos: Vector3, hitTarget: bo
 				createExplosion(endPos)
 				screenShake(1.2, 0.25)
 
+				-- Call the impact callback (destroys target, plays sounds, etc.)
+				if onImpact then
+					onImpact()
+				end
+
 				-- Clean up
 				bullet:Destroy()
 				bulletCamActive = false
@@ -657,6 +772,17 @@ local function createBulletCam(startPos: Vector3, endPos: Vector3, hitTarget: bo
 				-- Return camera
 				camera.CameraType = Enum.CameraType.Custom
 				player.CameraMode = Enum.CameraMode.LockFirstPerson
+
+				-- Restore zoom state if player was zoomed in
+				if isZoomed then
+					camera.FieldOfView = ZOOMED_FOV
+					if crosshairGui then
+						crosshairGui.Enabled = true
+					end
+					if breathMeterGui then
+						breathMeterGui.Enabled = true
+					end
+				end
 			end
 		end)
 	else
@@ -961,14 +1087,26 @@ local function createHitMarker(position: Vector3, isTarget: boolean)
 	end)
 end
 
--- Check if the part we hit is a Target
+-- Check if the part we hit is a Target (NPC or old-style target)
 local function isTarget(part: Part): boolean
+	-- Old style: Part named Target or in Targets folder
 	if part.Name == "Target" then
 		return true
 	end
 	if part.Parent and part.Parent.Name == "Targets" then
 		return true
 	end
+
+	-- NEW: Check if it's an NPC (has a Humanoid)
+	-- The part could be Head, Torso, Arm, Leg, etc.
+	local model = part.Parent
+	if model and model:IsA("Model") then
+		local humanoid = model:FindFirstChildOfClass("Humanoid")
+		if humanoid and humanoid.Health > 0 then
+			return true
+		end
+	end
+
 	return false
 end
 
@@ -1003,28 +1141,57 @@ local function shoot()
 
 	-- Check if we hit a target BEFORE creating the bullet
 	local hitTarget = false
+	local hitPart = nil
 	if result then
 		hitTarget = isTarget(result.Instance)
+		hitPart = result.Instance
 	end
 
-	-- Create bullet with potential slow-mo cam!
-	createBulletCam(bulletStart, bulletEnd, hitTarget)
+	-- Calculate distance for bullet cam decision
+	local distance = (bulletEnd - bulletStart).Magnitude
+	local willUseBulletCam = hitTarget and distance > 100 and not bulletCamActive
 
-	if result then
-		local hitPart = result.Instance
+	-- If using bullet cam on a moving target, FREEZE it in place!
+	if willUseBulletCam and hitPart then
+		-- Freeze the target so bullet visually hits it
+		hitPart.Anchored = true
+		-- If target is in a model, freeze all parts
+		if hitPart.Parent and hitPart.Parent:IsA("Model") then
+			for _, part in hitPart.Parent:GetDescendants() do
+				if part:IsA("BasePart") then
+					part.Anchored = true
+				end
+			end
+		end
+	end
 
-		createHitMarker(result.Position, hitTarget)
+	-- Function to handle the actual hit (destroy target, play sounds, etc.)
+	local function handleTargetHit()
+		if hitPart then
+			createHitMarker(bulletEnd, hitTarget)
+		end
 
-		if hitTarget then
+		if hitTarget and hitPart then
 			-- Play hit sound
 			hitSound:Play()
 
 			-- Show kill confirmation with distance!
-			local distance = (bulletEnd - bulletStart).Magnitude
 			showKillConfirmation(distance)
 
 			TargetHit:FireServer(hitPart)
 			updateKillCounter()
+		end
+	end
+
+	-- Create bullet with potential slow-mo cam!
+	if willUseBulletCam then
+		-- Long-range shot: delay hit effects until bullet arrives
+		createBulletCam(bulletStart, bulletEnd, hitTarget, handleTargetHit)
+	else
+		-- Short-range or miss: immediate effects
+		createBulletCam(bulletStart, bulletEnd, hitTarget, nil)
+		if result then
+			handleTargetHit()
 		end
 	end
 end

@@ -1,5 +1,22 @@
 # Sniper Elite - Game Dev Project
 
+> **This is Brayden's No-to-Pro Journey!** A dad & son project learning Roblox game dev.
+
+---
+
+## Brayden's Journey Log (README.md)
+
+**IMPORTANT:** The `README.md` at the project root is Brayden's **No-to-Pro Journey Log** - a fun, shareable record of everything he's learned and built!
+
+When Brayden says "update my README" or "log this win" or "Hey Beacon, update my journey":
+1. Read current `README.md`
+2. Add new accomplishments in the same fun tone
+3. Use "Level" structure for major milestones
+4. Celebrate HIS design choices and contributions
+5. Keep it shareable with friends!
+
+**Tone:** Enthusiastic, gaming-style ("Skills Unlocked!", "Level Up!"), encouraging
+
 ---
 
 ## Confidence & Communication
@@ -254,6 +271,13 @@ When invoked, Beacon MUST:
    - Keep CURRENT.md reflecting actual state
    - Create decision records when needed
    - Archive completed work
+
+5. **Update Brayden's Journey Log (when asked)**
+   - Update `README.md` with new accomplishments
+   - Maintain the fun "No-to-Pro" tone
+   - Use "Level" structure, "Skills Unlocked", etc.
+   - Celebrate HIS contributions and design choices
+   - This is something he shares with friends!
 
 ---
 
