@@ -11,6 +11,84 @@ local TargetHit = ReplicatedStorage:WaitForChild("Events"):WaitForChild("TargetH
 
 --[[
 	===========================================
+	PLAYER HEALTH SYSTEM (Path D)
+	===========================================
+
+	Tracks player health and communicates damage to clients.
+	When zombies reach the wall, players take damage!
+]]
+
+-- Create PlayerHealth event if it doesn't exist
+local Events = ReplicatedStorage:WaitForChild("Events")
+local PlayerHealth = Events:FindFirstChild("PlayerHealth")
+if not PlayerHealth then
+	PlayerHealth = Instance.new("RemoteEvent")
+	PlayerHealth.Name = "PlayerHealth"
+	PlayerHealth.Parent = Events
+end
+
+-- Player health settings
+local MAX_PLAYER_HEALTH = 100
+local ZOMBIE_WALL_DAMAGE = 10  -- Damage when zombie reaches wall
+
+-- Track each player's health
+local playerHealthData = {}
+
+-- Initialize health when player joins
+Players.PlayerAdded:Connect(function(player)
+	playerHealthData[player] = MAX_PLAYER_HEALTH
+	-- Tell client their starting health
+	PlayerHealth:FireClient(player, {
+		health = MAX_PLAYER_HEALTH,
+		maxHealth = MAX_PLAYER_HEALTH,
+		event = "init"
+	})
+	print(player.Name, "joined with", MAX_PLAYER_HEALTH, "HP")
+end)
+
+-- Clean up when player leaves
+Players.PlayerRemoving:Connect(function(player)
+	playerHealthData[player] = nil
+end)
+
+-- Function to damage a player (called when zombie reaches wall)
+local function damagePlayer(player, damage)
+	if not playerHealthData[player] then return end
+	if playerHealthData[player] <= 0 then return end  -- Already dead
+
+	-- Apply damage
+	playerHealthData[player] = math.max(0, playerHealthData[player] - damage)
+
+	-- Tell client about the damage
+	PlayerHealth:FireClient(player, {
+		health = playerHealthData[player],
+		maxHealth = MAX_PLAYER_HEALTH,
+		damage = damage,
+		event = "damage"
+	})
+
+	print(player.Name, "took", damage, "damage! HP:", playerHealthData[player])
+
+	-- Check for death
+	if playerHealthData[player] <= 0 then
+		PlayerHealth:FireClient(player, {
+			health = 0,
+			maxHealth = MAX_PLAYER_HEALTH,
+			event = "death"
+		})
+		print(player.Name, "has been defeated!")
+	end
+end
+
+-- Function to get all players (for damaging when zombie reaches wall)
+local function damageAllPlayers(damage)
+	for _, player in Players:GetPlayers() do
+		damagePlayer(player, damage)
+	end
+end
+
+--[[
+	===========================================
 	BRAYDEN'S ZOMBIE DEFENSE v3 - BORDER WALL
 	===========================================
 
@@ -775,11 +853,47 @@ local function startZombieAttack(zombie: Model)
 					end
 					humanoid:MoveTo(waypoint.Position)
 					humanoid.MoveToFinished:Wait()
+
+					--[[
+						PATH D - STEP D.3 & D.4: CHECK IF ZOMBIE REACHED WALL!
+
+						If zombie gets close to the wall (Z position < threshold),
+						it deals damage to ALL players and then dies!
+					]]
+					if zombie.PrimaryPart then
+						local zombieZ = zombie.PrimaryPart.Position.Z
+						local wallThreshold = WALL_POSITION_Z + WALL_THICKNESS/2 + 10  -- Close to wall
+
+						if zombieZ <= wallThreshold then
+							-- ZOMBIE REACHED THE WALL! Deal damage!
+							print("ZOMBIE BREACHED THE WALL! Dealing damage to players!")
+
+							-- Damage all players
+							damageAllPlayers(ZOMBIE_WALL_DAMAGE)
+
+							-- Kill this zombie (it sacrificed itself to attack)
+							humanoid:TakeDamage(1000)
+							return  -- Exit the attack loop
+						end
+					end
 				end
 			else
 				-- Fallback: just walk directly toward wall
 				humanoid:MoveTo(destination)
 				humanoid.MoveToFinished:Wait()
+
+				-- Also check wall distance in fallback mode
+				if zombie.PrimaryPart then
+					local zombieZ = zombie.PrimaryPart.Position.Z
+					local wallThreshold = WALL_POSITION_Z + WALL_THICKNESS/2 + 10
+
+					if zombieZ <= wallThreshold then
+						print("ZOMBIE BREACHED THE WALL! Dealing damage to players!")
+						damageAllPlayers(ZOMBIE_WALL_DAMAGE)
+						humanoid:TakeDamage(1000)
+						return
+					end
+				end
 			end
 
 			-- Brief pause then keep attacking
@@ -957,25 +1071,160 @@ local function initializeZombieDefense()
 end
 
 --[[
-	DAMAGE VALUES BY BODY PART
+	===========================================
+	LIMB DISMEMBERMENT SYSTEM
+	===========================================
 
-	Headshots are deadly! Body shots hurt. Limb shots are weaker.
+	Brayden's Design:
+	- Head shot = instant kill
+	- Torso shot = instant kill
+	- Arm shot = arm falls off, zombie slightly slower
+	- Leg shot = leg falls off, zombie crawls (MUCH slower)
+
+	Each limb has its own health pool. When destroyed, it detaches!
 ]]
-local DAMAGE_VALUES = {
-	["Head"] = 100,           -- Instant kill!
-	["Torso"] = 50,           -- 2 shots to kill
-	["Left Arm"] = 30,        -- Limb shots
+
+-- Limb health settings
+local LIMB_HEALTH = {
+	["Left Arm"] = 30,
 	["Right Arm"] = 30,
-	["Left Leg"] = 25,
-	["Right Leg"] = 25,
-	["HumanoidRootPart"] = 40, -- If they hit the invisible root
+	["Left Leg"] = 35,
+	["Right Leg"] = 35,
 }
 
---[[
-	HANDLE ZOMBIE HIT EVENT
+-- Speed penalties for missing limbs
+local SPEED_PENALTIES = {
+	["Left Arm"] = 0.05,    -- 5% slower per arm
+	["Right Arm"] = 0.05,
+	["Left Leg"] = 0.40,    -- 40% slower per leg (big penalty!)
+	["Right Leg"] = 0.40,
+}
 
-	When player shoots a zombie, deal damage based on where they hit.
-	Returns damage info to client for visual feedback.
+-- Track limb status for each zombie
+-- Format: zombieLimbData[zombie] = { ["Left Arm"] = health, ... , missingLimbs = {} }
+local zombieLimbData = {}
+
+-- Initialize limb data when zombie spawns
+local function initZombieLimbs(zombie)
+	zombieLimbData[zombie] = {
+		["Left Arm"] = LIMB_HEALTH["Left Arm"],
+		["Right Arm"] = LIMB_HEALTH["Right Arm"],
+		["Left Leg"] = LIMB_HEALTH["Left Leg"],
+		["Right Leg"] = LIMB_HEALTH["Right Leg"],
+		missingLimbs = {},
+		originalSpeed = ZOMBIE_WALK_SPEED,
+	}
+end
+
+-- Clean up limb data when zombie dies
+local function cleanupZombieLimbs(zombie)
+	zombieLimbData[zombie] = nil
+end
+
+--[[
+	DETACH LIMB FROM ZOMBIE
+
+	When a limb takes too much damage, it falls off!
+	- Breaks the Motor6D joint
+	- Applies physics to the severed limb
+	- Slows the zombie down
+]]
+local function detachLimb(zombie, limbName)
+	local limb = zombie:FindFirstChild(limbName)
+	if not limb then return end
+
+	local limbData = zombieLimbData[zombie]
+	if not limbData then return end
+
+	-- Don't detach twice
+	if limbData.missingLimbs[limbName] then return end
+	limbData.missingLimbs[limbName] = true
+
+	print(zombie.Name, "lost their", limbName, "!")
+
+	-- Find and destroy the joint connecting this limb
+	local torso = zombie:FindFirstChild("Torso")
+	if torso then
+		for _, motor in torso:GetChildren() do
+			if motor:IsA("Motor6D") and motor.Part1 == limb then
+				motor:Destroy()
+				break
+			end
+		end
+	end
+
+	-- Make the limb physical (falls off!)
+	limb.CanCollide = true
+	limb.Anchored = false
+
+	-- Apply some force so it flies off dramatically
+	local flyDirection = Vector3.new(
+		math.random(-20, 20),
+		math.random(10, 30),
+		math.random(-20, 20)
+	)
+	limb:ApplyImpulse(flyDirection)
+
+	-- Add some spin
+	limb:ApplyAngularImpulse(Vector3.new(
+		math.random(-10, 10),
+		math.random(-10, 10),
+		math.random(-10, 10)
+	))
+
+	-- Make the limb darker (dead flesh)
+	limb.Color = Color3.fromRGB(60, 80, 60)
+
+	-- Fade out and destroy the severed limb after a few seconds
+	task.delay(5, function()
+		if limb and limb.Parent then
+			TweenService:Create(limb, TweenInfo.new(1), {Transparency = 1}):Play()
+			task.wait(1)
+			if limb and limb.Parent then
+				limb:Destroy()
+			end
+		end
+	end)
+
+	-- SLOW DOWN THE ZOMBIE based on missing limbs
+	local humanoid = zombie:FindFirstChildOfClass("Humanoid")
+	if humanoid then
+		local totalPenalty = 0
+		for missingLimb, _ in pairs(limbData.missingLimbs) do
+			totalPenalty = totalPenalty + (SPEED_PENALTIES[missingLimb] or 0)
+		end
+
+		-- Calculate new speed (minimum 10% of original)
+		local speedMultiplier = math.max(0.1, 1 - totalPenalty)
+		local newSpeed = limbData.originalSpeed * speedMultiplier
+
+		humanoid.WalkSpeed = newSpeed
+
+		-- If both legs are gone, they're CRAWLING
+		if limbData.missingLimbs["Left Leg"] and limbData.missingLimbs["Right Leg"] then
+			humanoid.WalkSpeed = limbData.originalSpeed * 0.15  -- Super slow crawl!
+			print(zombie.Name, "is now CRAWLING!")
+		-- If one leg is gone, they're hobbling
+		elseif limbData.missingLimbs["Left Leg"] or limbData.missingLimbs["Right Leg"] then
+			print(zombie.Name, "is now HOBBLING!")
+		end
+	end
+
+	-- Play limb detach sound
+	local detachSound = Instance.new("Sound")
+	detachSound.SoundId = "rbxassetid://3362267957"  -- Flesh/bone sound
+	detachSound.Volume = 0.7
+	detachSound.Parent = limb
+	detachSound:Play()
+end
+
+--[[
+	HANDLE ZOMBIE HIT EVENT (WITH DISMEMBERMENT)
+
+	When player shoots a zombie:
+	- Head = instant kill
+	- Torso = instant kill
+	- Arms/Legs = damage that limb, may detach it
 ]]
 TargetHit.OnServerEvent:Connect(function(player, hitPart)
 	if not hitPart or not hitPart:IsA("BasePart") then
@@ -999,22 +1248,70 @@ TargetHit.OnServerEvent:Connect(function(player, hitPart)
 		return
 	end
 
-	-- Calculate damage based on body part hit
+	-- Initialize limb data if not exists
+	if not zombieLimbData[zombie] then
+		initZombieLimbs(zombie)
+	end
+
 	local bodyPart = hitPart.Name
-	local damage = DAMAGE_VALUES[bodyPart] or 35  -- Default damage if unknown part
+	local limbData = zombieLimbData[zombie]
+	local damage = 0
+	local isHeadshot = false
+	local isTorsoShot = false
+	local limbDetached = false
 
-	-- Check if it's a headshot
-	local isHeadshot = (bodyPart == "Head")
+	-- HEAD SHOT = INSTANT KILL
+	if bodyPart == "Head" then
+		damage = 1000  -- Overkill to ensure death
+		isHeadshot = true
+		humanoid:TakeDamage(damage)
+		print(player.Name, "HEADSHOT on", zombie.Name, "- INSTANT KILL!")
 
-	print(player.Name, "shot", zombie.Name, "in the", bodyPart, "for", damage, "damage!")
+	-- TORSO SHOT = INSTANT KILL
+	elseif bodyPart == "Torso" or bodyPart == "HumanoidRootPart" then
+		damage = 1000  -- Overkill to ensure death
+		isTorsoShot = true
+		humanoid:TakeDamage(damage)
+		print(player.Name, "TORSO SHOT on", zombie.Name, "- INSTANT KILL!")
 
-	-- Deal damage
-	humanoid:TakeDamage(damage)
+	-- LIMB SHOT = DAMAGE LIMB, MAYBE DETACH
+	elseif LIMB_HEALTH[bodyPart] then
+		-- Check if limb is already gone
+		if limbData.missingLimbs[bodyPart] then
+			-- Limb already detached, deal small damage to body
+			damage = 15
+			humanoid:TakeDamage(damage)
+			print(player.Name, "shot where", zombie.Name, "'s", bodyPart, "USED to be!")
+		else
+			-- Damage this specific limb
+			damage = 35  -- Damage per shot to limb
+			limbData[bodyPart] = limbData[bodyPart] - damage
+
+			print(player.Name, "shot", zombie.Name, "'s", bodyPart, "- Limb HP:", limbData[bodyPart])
+
+			-- Check if limb should detach
+			if limbData[bodyPart] <= 0 then
+				detachLimb(zombie, bodyPart)
+				limbDetached = true
+				-- Small damage to overall health when limb detaches
+				humanoid:TakeDamage(10)
+			end
+		end
+
+	-- UNKNOWN PART
+	else
+		damage = 25
+		humanoid:TakeDamage(damage)
+		print(player.Name, "shot", zombie.Name, "in unknown part:", bodyPart)
+	end
 
 	-- Send damage info back to client for visual feedback
 	TargetHit:FireClient(player, {
 		damage = damage,
 		isHeadshot = isHeadshot,
+		isTorsoShot = isTorsoShot,
+		limbDetached = limbDetached,
+		limbName = bodyPart,
 		position = hitPart.Position,
 		remainingHealth = math.max(0, humanoid.Health),
 		maxHealth = humanoid.MaxHealth,
@@ -1022,6 +1319,24 @@ TargetHit.OnServerEvent:Connect(function(player, hitPart)
 		killed = humanoid.Health <= 0
 	})
 end)
+
+-- Hook limb initialization into zombie spawn
+local originalSpawnZombieForLimbs = spawnZombie
+spawnZombie = function(spawnData)
+	local zombie = originalSpawnZombieForLimbs(spawnData)
+	if zombie then
+		initZombieLimbs(zombie)
+
+		-- Clean up limb data when zombie dies
+		local humanoid = zombie:FindFirstChildOfClass("Humanoid")
+		if humanoid then
+			humanoid.Died:Connect(function()
+				cleanupZombieLimbs(zombie)
+			end)
+		end
+	end
+	return zombie
+end
 
 -- INITIALIZE ZOMBIE DEFENSE GAME!
 initializeZombieDefense()
@@ -1039,4 +1354,180 @@ print("  ZOMBIE DEFENSE v3 - BRAYDEN'S DREAM!")
 print("  You're on THE WALL!")
 print("  Snipe zombies emerging from the forest!")
 print("  DEFEND THE BORDER!")
+print("===========================================")
+
+--[[
+	===========================================
+	PATH E: AUDIO & ATMOSPHERE SYSTEM
+	===========================================
+
+	E.1 & E.2: Ambient forest sounds
+	E.3 & E.4: Zombie moan sounds
+
+	Creates an immersive audio experience!
+]]
+
+local SoundService = game:GetService("SoundService")
+
+-- Sound IDs for ambient audio
+local AMBIENT_SOUNDS = {
+	forestWind = "rbxassetid://9120850823",      -- Creepy wind/forest ambience
+	forestNight = "rbxassetid://9120855174",     -- Nighttime forest sounds
+	distantThunder = "rbxassetid://12222253",    -- Distant rumbling (tension)
+}
+
+local ZOMBIE_MOAN_SOUNDS = {
+	"rbxassetid://4813953830",  -- Zombie groan 1
+	"rbxassetid://4813954619",  -- Zombie groan 2
+	"rbxassetid://4813955329",  -- Zombie moan
+	"rbxassetid://4813956016",  -- Zombie growl
+}
+
+--[[
+	CREATE AMBIENT SOUND EMITTERS
+
+	Places invisible sound emitters in the forest that create
+	a creepy, immersive atmosphere. Players hear these sounds
+	spatially based on their position!
+]]
+local function createAmbientAudio()
+	local ambientFolder = Instance.new("Folder")
+	ambientFolder.Name = "AmbientAudio"
+	ambientFolder.Parent = workspace
+
+	-- Main forest ambient (loops continuously)
+	-- Place it in the center of the forest
+	local forestAmbientPart = Instance.new("Part")
+	forestAmbientPart.Name = "ForestAmbientEmitter"
+	forestAmbientPart.Size = Vector3.new(1, 1, 1)
+	forestAmbientPart.Position = Vector3.new(0, 10, FOREST_START_Z + 100)  -- Center of forest
+	forestAmbientPart.Transparency = 1
+	forestAmbientPart.CanCollide = false
+	forestAmbientPart.Anchored = true
+	forestAmbientPart.Parent = ambientFolder
+
+	local forestSound = Instance.new("Sound")
+	forestSound.Name = "ForestAmbient"
+	forestSound.SoundId = AMBIENT_SOUNDS.forestWind
+	forestSound.Volume = 0.4
+	forestSound.Looped = true
+	forestSound.RollOffMode = Enum.RollOffMode.Linear
+	forestSound.RollOffMinDistance = 50
+	forestSound.RollOffMaxDistance = 400  -- Can hear from far away
+	forestSound.Parent = forestAmbientPart
+	forestSound:Play()
+
+	-- Secondary night sounds (more subtle)
+	local nightSound = Instance.new("Sound")
+	nightSound.Name = "NightAmbient"
+	nightSound.SoundId = AMBIENT_SOUNDS.forestNight
+	nightSound.Volume = 0.25
+	nightSound.Looped = true
+	nightSound.RollOffMode = Enum.RollOffMode.Linear
+	nightSound.RollOffMinDistance = 30
+	nightSound.RollOffMaxDistance = 300
+	nightSound.Parent = forestAmbientPart
+	nightSound:Play()
+
+	-- Distant thunder/rumble for tension (plays occasionally)
+	task.spawn(function()
+		while true do
+			task.wait(math.random(30, 60))  -- Every 30-60 seconds
+
+			local thunderPart = Instance.new("Part")
+			thunderPart.Size = Vector3.new(1, 1, 1)
+			thunderPart.Position = Vector3.new(
+				math.random(-200, 200),
+				50,
+				math.random(100, 300)
+			)
+			thunderPart.Transparency = 1
+			thunderPart.CanCollide = false
+			thunderPart.Anchored = true
+			thunderPart.Parent = ambientFolder
+
+			local thunder = Instance.new("Sound")
+			thunder.SoundId = AMBIENT_SOUNDS.distantThunder
+			thunder.Volume = 0.3
+			thunder.RollOffMode = Enum.RollOffMode.Linear
+			thunder.RollOffMinDistance = 100
+			thunder.RollOffMaxDistance = 500
+			thunder.Parent = thunderPart
+			thunder:Play()
+
+			thunder.Ended:Connect(function()
+				thunderPart:Destroy()
+			end)
+		end
+	end)
+
+	print("Ambient audio system initialized!")
+	print("  - Forest wind ambience")
+	print("  - Night sounds")
+	print("  - Distant thunder")
+end
+
+--[[
+	ZOMBIE MOAN SYSTEM (E.3 & E.4)
+
+	Makes zombies randomly moan/groan while walking.
+	Creates a creepy atmosphere when multiple zombies are around!
+]]
+local function startZombieMoaning(zombie: Model)
+	task.spawn(function()
+		local humanoid = zombie:FindFirstChildOfClass("Humanoid")
+		local head = zombie:FindFirstChild("Head")
+
+		if not humanoid or not head then return end
+
+		while zombie and zombie.Parent and humanoid and humanoid.Health > 0 do
+			-- Random delay between moans (8-20 seconds)
+			task.wait(math.random(8, 20))
+
+			-- Only moan if zombie is still alive
+			if not zombie or not zombie.Parent then break end
+			if not humanoid or humanoid.Health <= 0 then break end
+
+			-- Pick a random moan sound
+			local moanId = ZOMBIE_MOAN_SOUNDS[math.random(1, #ZOMBIE_MOAN_SOUNDS)]
+
+			-- Create and play the moan (spatial sound from zombie's head)
+			local moan = Instance.new("Sound")
+			moan.SoundId = moanId
+			moan.Volume = math.random(30, 60) / 100  -- Random volume 0.3-0.6
+			moan.PlaybackSpeed = math.random(80, 120) / 100  -- Slight pitch variation
+			moan.RollOffMode = Enum.RollOffMode.Linear
+			moan.RollOffMinDistance = 20
+			moan.RollOffMaxDistance = 150  -- Can hear from tower!
+			moan.Parent = head
+			moan:Play()
+
+			-- Clean up after playing
+			moan.Ended:Connect(function()
+				moan:Destroy()
+			end)
+		end
+	end)
+end
+
+-- Initialize ambient audio
+createAmbientAudio()
+
+-- Hook zombie moaning into the spawn system
+-- We need to modify spawnZombie to call startZombieMoaning
+local originalSpawnZombie = spawnZombie
+
+-- Override spawnZombie to add moaning
+spawnZombie = function(spawnData)
+	local zombie = originalSpawnZombie(spawnData)
+	if zombie then
+		startZombieMoaning(zombie)
+	end
+	return zombie
+end
+
+print("===========================================")
+print("  AUDIO SYSTEM ACTIVE!")
+print("  - Forest ambience playing")
+print("  - Zombies will moan as they walk")
 print("===========================================")

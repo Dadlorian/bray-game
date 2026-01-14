@@ -103,6 +103,64 @@ local function showDamageNumber(position: Vector3, damage: number, isHeadshot: b
 	end)
 end
 
+--[[
+	LIMB DETACHMENT POPUP
+
+	Shows a special message when you blow off a zombie's limb!
+]]
+local function showLimbDetachedPopup(limbName)
+	local playerGui = player:WaitForChild("PlayerGui")
+
+	-- Determine the message based on limb type
+	local message = "LIMB BLOWN OFF!"
+	local color = Color3.fromRGB(255, 150, 50)
+
+	if limbName == "Left Leg" or limbName == "Right Leg" then
+		message = "LEG DESTROYED!"
+		color = Color3.fromRGB(255, 100, 100)
+	elseif limbName == "Left Arm" or limbName == "Right Arm" then
+		message = "ARM BLOWN OFF!"
+		color = Color3.fromRGB(255, 180, 50)
+	end
+
+	-- Create popup
+	local popup = Instance.new("ScreenGui")
+	popup.Name = "LimbPopup"
+	popup.DisplayOrder = 450
+	popup.Parent = playerGui
+
+	local label = Instance.new("TextLabel")
+	label.Size = UDim2.new(1, 0, 0, 50)
+	label.Position = UDim2.new(0, 0, 0.35, 0)
+	label.BackgroundTransparency = 1
+	label.Text = message
+	label.TextColor3 = color
+	label.TextSize = 32
+	label.Font = Enum.Font.GothamBold
+	label.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
+	label.TextStrokeTransparency = 0
+	label.Parent = popup
+
+	-- Scale animation
+	label.TextSize = 16
+	local growTween = TweenService:Create(label, TweenInfo.new(0.15, Enum.EasingStyle.Back), {
+		TextSize = 32
+	})
+	growTween:Play()
+
+	-- Fade out
+	task.delay(1, function()
+		local fadeOut = TweenService:Create(label, TweenInfo.new(0.3), {
+			TextTransparency = 1,
+			TextStrokeTransparency = 1
+		})
+		fadeOut:Play()
+		fadeOut.Completed:Connect(function()
+			popup:Destroy()
+		end)
+	end)
+end
+
 -- Listen for damage feedback from server
 TargetHit.OnClientEvent:Connect(function(damageInfo)
 	if damageInfo and damageInfo.damage then
@@ -121,10 +179,10 @@ TargetHit.OnClientEvent:Connect(function(damageInfo)
 				headshotDing:Destroy()
 			end)
 
-			-- HEADSHOT VOICE! Says "HEADSHOT!" in a cool announcer voice
+			-- HEADSHOT VOICE! Says "HEADSHOT!" in a cool English announcer voice
 			local headshotVoice = Instance.new("Sound")
-			headshotVoice.SoundId = "rbxassetid://616594208"  -- Classic "HEADSHOT!" announcer
-			headshotVoice.Volume = 1.2  -- Nice and loud!
+			headshotVoice.SoundId = "rbxassetid://287390459"  -- English "HEADSHOT!" announcer (FPS style)
+			headshotVoice.Volume = 1.0  -- Nice and loud!
 			headshotVoice.PlaybackSpeed = 1.0
 			headshotVoice.Parent = player:WaitForChild("PlayerGui")
 
@@ -135,6 +193,47 @@ TargetHit.OnClientEvent:Connect(function(damageInfo)
 
 			headshotVoice.Ended:Connect(function()
 				headshotVoice:Destroy()
+			end)
+		end
+
+		-- LIMB DETACHMENT FEEDBACK
+		if damageInfo.limbDetached then
+			showLimbDetachedPopup(damageInfo.limbName)
+
+			-- Play a satisfying crunch sound
+			local crunchSound = Instance.new("Sound")
+			crunchSound.SoundId = "rbxassetid://3362267957"
+			crunchSound.Volume = 0.6
+			crunchSound.Parent = player:WaitForChild("PlayerGui")
+			crunchSound:Play()
+			crunchSound.Ended:Connect(function()
+				crunchSound:Destroy()
+			end)
+		end
+
+		-- TORSO SHOT FEEDBACK (instant kill)
+		if damageInfo.isTorsoShot and damageInfo.killed then
+			-- Show "BODY SHOT!" text
+			local playerGui = player:WaitForChild("PlayerGui")
+			local popup = Instance.new("ScreenGui")
+			popup.Name = "BodyShotPopup"
+			popup.DisplayOrder = 450
+			popup.Parent = playerGui
+
+			local label = Instance.new("TextLabel")
+			label.Size = UDim2.new(1, 0, 0, 50)
+			label.Position = UDim2.new(0, 0, 0.25, 0)
+			label.BackgroundTransparency = 1
+			label.Text = "BODY SHOT!"
+			label.TextColor3 = Color3.fromRGB(255, 100, 50)
+			label.TextSize = 36
+			label.Font = Enum.Font.GothamBold
+			label.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
+			label.TextStrokeTransparency = 0
+			label.Parent = popup
+
+			task.delay(1, function()
+				popup:Destroy()
 			end)
 		end
 	end
@@ -1331,3 +1430,596 @@ RunService.RenderStepped:Connect(function(deltaTime)
 	local swayRotation = CFrame.Angles(math.rad(swayY), math.rad(swayX), 0)
 	camera.CFrame = currentCFrame * swayRotation
 end)
+
+--[[
+	===========================================
+	PLAYER HEALTH UI SYSTEM (Path D)
+	===========================================
+
+	Shows your health bar and handles game over!
+	D.2: Health bar UI
+	D.5: Red flash when damaged
+	D.6: Game over screen
+	D.7: Play again button
+	D.8: Final score display
+]]
+
+-- Wait for the PlayerHealth event from server
+local PlayerHealth = ReplicatedStorage:WaitForChild("Events"):WaitForChild("PlayerHealth")
+
+-- Track player health locally for UI
+local currentHealth = 100
+local maxHealth = 100
+local isGameOver = false
+
+-- Forward declaration for background music (defined later in Path E)
+local backgroundMusic = nil
+
+-- Create the health bar UI (D.2)
+local healthBarGui = nil
+local healthFillBar = nil
+local healthText = nil
+
+local function createHealthBarUI()
+	local playerGui = player:WaitForChild("PlayerGui")
+
+	-- Remove old one if exists
+	if playerGui:FindFirstChild("PlayerHealthUI") then
+		playerGui.PlayerHealthUI:Destroy()
+	end
+
+	local screenGui = Instance.new("ScreenGui")
+	screenGui.Name = "PlayerHealthUI"
+	screenGui.ResetOnSpawn = false
+	screenGui.Parent = playerGui
+
+	-- Main container at bottom center
+	local container = Instance.new("Frame")
+	container.Name = "HealthContainer"
+	container.Size = UDim2.new(0, 300, 0, 40)
+	container.Position = UDim2.new(0.5, -150, 1, -60)  -- Bottom center
+	container.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+	container.BackgroundTransparency = 0.4
+	container.BorderSizePixel = 0
+	container.Parent = screenGui
+
+	local containerCorner = Instance.new("UICorner")
+	containerCorner.CornerRadius = UDim.new(0, 8)
+	containerCorner.Parent = container
+
+	-- "HP" label on left
+	local hpLabel = Instance.new("TextLabel")
+	hpLabel.Name = "HPLabel"
+	hpLabel.Size = UDim2.new(0, 40, 1, 0)
+	hpLabel.Position = UDim2.new(0, 5, 0, 0)
+	hpLabel.BackgroundTransparency = 1
+	hpLabel.Text = "HP"
+	hpLabel.TextColor3 = Color3.fromRGB(255, 100, 100)
+	hpLabel.TextSize = 20
+	hpLabel.Font = Enum.Font.GothamBold
+	hpLabel.Parent = container
+
+	-- Health bar background
+	local barBackground = Instance.new("Frame")
+	barBackground.Name = "BarBackground"
+	barBackground.Size = UDim2.new(0, 200, 0, 20)
+	barBackground.Position = UDim2.new(0, 50, 0.5, -10)
+	barBackground.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+	barBackground.BorderSizePixel = 0
+	barBackground.Parent = container
+
+	local barBgCorner = Instance.new("UICorner")
+	barBgCorner.CornerRadius = UDim.new(0, 6)
+	barBgCorner.Parent = barBackground
+
+	-- Health bar fill (the part that shrinks)
+	local barFill = Instance.new("Frame")
+	barFill.Name = "BarFill"
+	barFill.Size = UDim2.new(1, 0, 1, 0)  -- Starts full
+	barFill.Position = UDim2.new(0, 0, 0, 0)
+	barFill.BackgroundColor3 = Color3.fromRGB(50, 255, 50)  -- Green
+	barFill.BorderSizePixel = 0
+	barFill.Parent = barBackground
+
+	local barFillCorner = Instance.new("UICorner")
+	barFillCorner.CornerRadius = UDim.new(0, 6)
+	barFillCorner.Parent = barFill
+
+	healthFillBar = barFill
+
+	-- Health text (shows numbers)
+	local healthNum = Instance.new("TextLabel")
+	healthNum.Name = "HealthText"
+	healthNum.Size = UDim2.new(0, 50, 1, 0)
+	healthNum.Position = UDim2.new(1, -55, 0, 0)
+	healthNum.BackgroundTransparency = 1
+	healthNum.Text = "100"
+	healthNum.TextColor3 = Color3.fromRGB(255, 255, 255)
+	healthNum.TextSize = 18
+	healthNum.Font = Enum.Font.GothamBold
+	healthNum.Parent = container
+
+	healthText = healthNum
+	healthBarGui = screenGui
+
+	return screenGui
+end
+
+-- Update the health bar display
+local function updateHealthBar(health, maxHp)
+	if not healthFillBar or not healthText then return end
+
+	local healthPercent = math.clamp(health / maxHp, 0, 1)
+
+	-- Animate the bar width
+	TweenService:Create(healthFillBar, TweenInfo.new(0.3, Enum.EasingStyle.Quad), {
+		Size = UDim2.new(healthPercent, 0, 1, 0)
+	}):Play()
+
+	-- Change color based on health
+	local healthColor
+	if healthPercent > 0.6 then
+		healthColor = Color3.fromRGB(50, 255, 50)   -- Green
+	elseif healthPercent > 0.3 then
+		healthColor = Color3.fromRGB(255, 255, 50)  -- Yellow
+	else
+		healthColor = Color3.fromRGB(255, 50, 50)   -- Red
+	end
+
+	TweenService:Create(healthFillBar, TweenInfo.new(0.3), {
+		BackgroundColor3 = healthColor
+	}):Play()
+
+	-- Update text
+	healthText.Text = tostring(math.floor(health))
+end
+
+-- Red flash effect when damaged (D.5)
+local damageFlashGui = nil
+
+local function createDamageFlash()
+	local playerGui = player:WaitForChild("PlayerGui")
+
+	-- Create flash overlay
+	local flashGui = Instance.new("ScreenGui")
+	flashGui.Name = "DamageFlash"
+	flashGui.IgnoreGuiInset = true
+	flashGui.DisplayOrder = 999  -- On top of everything
+	flashGui.Parent = playerGui
+
+	local flash = Instance.new("Frame")
+	flash.Name = "Flash"
+	flash.Size = UDim2.new(1, 0, 1, 0)
+	flash.BackgroundColor3 = Color3.fromRGB(255, 0, 0)
+	flash.BackgroundTransparency = 1  -- Start invisible
+	flash.BorderSizePixel = 0
+	flash.Parent = flashGui
+
+	damageFlashGui = flash
+	return flashGui
+end
+
+local function showDamageFlash()
+	if not damageFlashGui then return end
+
+	-- Flash red then fade out
+	damageFlashGui.BackgroundTransparency = 0.5
+
+	local fadeOut = TweenService:Create(damageFlashGui, TweenInfo.new(0.3), {
+		BackgroundTransparency = 1
+	})
+	fadeOut:Play()
+
+	-- Play hurt sound
+	local hurtSound = Instance.new("Sound")
+	hurtSound.SoundId = "rbxassetid://535690488"  -- Hurt/pain sound
+	hurtSound.Volume = 0.6
+	hurtSound.Parent = player:WaitForChild("PlayerGui")
+	hurtSound:Play()
+	hurtSound.Ended:Connect(function()
+		hurtSound:Destroy()
+	end)
+end
+
+-- Game Over screen (D.6, D.7, D.8)
+local gameOverGui = nil
+
+local function showGameOver()
+	isGameOver = true
+
+	local playerGui = player:WaitForChild("PlayerGui")
+
+	-- Remove old game over if exists
+	if playerGui:FindFirstChild("GameOverUI") then
+		playerGui.GameOverUI:Destroy()
+	end
+
+	local screenGui = Instance.new("ScreenGui")
+	screenGui.Name = "GameOverUI"
+	screenGui.IgnoreGuiInset = true
+	screenGui.DisplayOrder = 1000  -- On top of everything
+	screenGui.Parent = playerGui
+
+	-- Dark overlay
+	local overlay = Instance.new("Frame")
+	overlay.Name = "Overlay"
+	overlay.Size = UDim2.new(1, 0, 1, 0)
+	overlay.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+	overlay.BackgroundTransparency = 0.5
+	overlay.BorderSizePixel = 0
+	overlay.Parent = screenGui
+
+	-- Main container
+	local container = Instance.new("Frame")
+	container.Name = "Container"
+	container.Size = UDim2.new(0, 400, 0, 300)
+	container.Position = UDim2.new(0.5, -200, 0.5, -150)
+	container.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+	container.BackgroundTransparency = 0.2
+	container.BorderSizePixel = 0
+	container.Parent = screenGui
+
+	local containerCorner = Instance.new("UICorner")
+	containerCorner.CornerRadius = UDim.new(0, 12)
+	containerCorner.Parent = container
+
+	-- "GAME OVER" title (D.6)
+	local title = Instance.new("TextLabel")
+	title.Name = "Title"
+	title.Size = UDim2.new(1, 0, 0, 60)
+	title.Position = UDim2.new(0, 0, 0, 20)
+	title.BackgroundTransparency = 1
+	title.Text = "GAME OVER"
+	title.TextColor3 = Color3.fromRGB(255, 50, 50)
+	title.TextSize = 48
+	title.Font = Enum.Font.GothamBold
+	title.Parent = container
+
+	-- Subtitle
+	local subtitle = Instance.new("TextLabel")
+	subtitle.Name = "Subtitle"
+	subtitle.Size = UDim2.new(1, 0, 0, 30)
+	subtitle.Position = UDim2.new(0, 0, 0, 80)
+	subtitle.BackgroundTransparency = 1
+	subtitle.Text = "The zombies breached the wall..."
+	subtitle.TextColor3 = Color3.fromRGB(200, 200, 200)
+	subtitle.TextSize = 18
+	subtitle.Font = Enum.Font.Gotham
+	subtitle.Parent = container
+
+	-- Final score display (D.8)
+	local scoreLabel = Instance.new("TextLabel")
+	scoreLabel.Name = "ScoreLabel"
+	scoreLabel.Size = UDim2.new(1, 0, 0, 40)
+	scoreLabel.Position = UDim2.new(0, 0, 0, 130)
+	scoreLabel.BackgroundTransparency = 1
+	scoreLabel.Text = "FINAL SCORE"
+	scoreLabel.TextColor3 = Color3.fromRGB(255, 200, 50)
+	scoreLabel.TextSize = 20
+	scoreLabel.Font = Enum.Font.GothamBold
+	scoreLabel.Parent = container
+
+	local scoreValue = Instance.new("TextLabel")
+	scoreValue.Name = "ScoreValue"
+	scoreValue.Size = UDim2.new(1, 0, 0, 50)
+	scoreValue.Position = UDim2.new(0, 0, 0, 160)
+	scoreValue.BackgroundTransparency = 1
+	scoreValue.Text = tostring(totalPoints) .. " POINTS"
+	scoreValue.TextColor3 = Color3.fromRGB(255, 255, 255)
+	scoreValue.TextSize = 36
+	scoreValue.Font = Enum.Font.GothamBold
+	scoreValue.Parent = container
+
+	local killsValue = Instance.new("TextLabel")
+	killsValue.Name = "KillsValue"
+	killsValue.Size = UDim2.new(1, 0, 0, 30)
+	killsValue.Position = UDim2.new(0, 0, 0, 200)
+	killsValue.BackgroundTransparency = 1
+	killsValue.Text = kills .. " Zombies Eliminated"
+	killsValue.TextColor3 = Color3.fromRGB(180, 180, 180)
+	killsValue.TextSize = 16
+	killsValue.Font = Enum.Font.Gotham
+	killsValue.Parent = container
+
+	-- Play Again button (D.7)
+	local playAgainBtn = Instance.new("TextButton")
+	playAgainBtn.Name = "PlayAgainButton"
+	playAgainBtn.Size = UDim2.new(0, 200, 0, 50)
+	playAgainBtn.Position = UDim2.new(0.5, -100, 1, -70)
+	playAgainBtn.BackgroundColor3 = Color3.fromRGB(50, 200, 50)
+	playAgainBtn.BorderSizePixel = 0
+	playAgainBtn.Text = "PLAY AGAIN"
+	playAgainBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+	playAgainBtn.TextSize = 24
+	playAgainBtn.Font = Enum.Font.GothamBold
+	playAgainBtn.Parent = container
+
+	local btnCorner = Instance.new("UICorner")
+	btnCorner.CornerRadius = UDim.new(0, 8)
+	btnCorner.Parent = playAgainBtn
+
+	-- Button hover effect
+	playAgainBtn.MouseEnter:Connect(function()
+		TweenService:Create(playAgainBtn, TweenInfo.new(0.1), {
+			BackgroundColor3 = Color3.fromRGB(70, 255, 70)
+		}):Play()
+	end)
+
+	playAgainBtn.MouseLeave:Connect(function()
+		TweenService:Create(playAgainBtn, TweenInfo.new(0.1), {
+			BackgroundColor3 = Color3.fromRGB(50, 200, 50)
+		}):Play()
+	end)
+
+	-- Play Again click - respawn player
+	playAgainBtn.MouseButton1Click:Connect(function()
+		-- Reset local state
+		kills = 0
+		totalPoints = 0
+		isGameOver = false
+
+		-- Update displays
+		if killLabel then
+			killLabel.Text = "KILLS: 0"
+		end
+		if pointsLabel then
+			pointsLabel.Text = "POINTS: 0"
+		end
+
+		-- Remove game over screen
+		screenGui:Destroy()
+
+		-- Request respawn from server (this resets health too)
+		player:LoadCharacter()
+	end)
+
+	-- Play game over sound
+	local gameOverSound = Instance.new("Sound")
+	gameOverSound.SoundId = "rbxassetid://277057259"  -- Dramatic game over
+	gameOverSound.Volume = 0.8
+	gameOverSound.Parent = playerGui
+	gameOverSound:Play()
+	gameOverSound.Ended:Connect(function()
+		gameOverSound:Destroy()
+	end)
+
+	gameOverGui = screenGui
+end
+
+-- Initialize health UI
+createHealthBarUI()
+createDamageFlash()
+
+-- Listen for health updates from server
+PlayerHealth.OnClientEvent:Connect(function(data)
+	if data.event == "init" then
+		-- Starting health
+		currentHealth = data.health
+		maxHealth = data.maxHealth
+		updateHealthBar(currentHealth, maxHealth)
+		print("Health initialized:", currentHealth)
+
+	elseif data.event == "damage" then
+		-- Took damage!
+		currentHealth = data.health
+		updateHealthBar(currentHealth, maxHealth)
+		showDamageFlash()
+		print("Took damage! Health:", currentHealth)
+
+	elseif data.event == "death" then
+		-- Game over!
+		currentHealth = 0
+		updateHealthBar(0, maxHealth)
+		showGameOver()
+		-- Stop music on death
+		if backgroundMusic then
+			backgroundMusic:Stop()
+		end
+		print("GAME OVER!")
+	end
+end)
+
+--[[
+	===========================================
+	PATH E: BACKGROUND MUSIC SYSTEM (E.5 & E.6)
+	===========================================
+
+	Plays tense background music that gets more intense
+	as your health gets lower!
+]]
+
+-- Music sound IDs
+local MUSIC_TRACKS = {
+	ambient = "rbxassetid://1837849285",     -- Tense ambient/horror
+	intense = "rbxassetid://1836311602",     -- More intense action
+}
+
+-- backgroundMusic is forward-declared above (in Path D section)
+local musicIntensity = "ambient"  -- Current music state
+
+local function createBackgroundMusic()
+	local playerGui = player:WaitForChild("PlayerGui")
+
+	-- Create ambient music (always playing)
+	backgroundMusic = Instance.new("Sound")
+	backgroundMusic.Name = "BackgroundMusic"
+	backgroundMusic.SoundId = MUSIC_TRACKS.ambient
+	backgroundMusic.Volume = 0.15  -- Quiet background
+	backgroundMusic.Looped = true
+	backgroundMusic.Parent = playerGui
+	backgroundMusic:Play()
+
+	print("Background music started!")
+end
+
+-- Update music intensity based on health (E.6)
+local function updateMusicIntensity(healthPercent)
+	if not backgroundMusic then return end
+
+	if healthPercent <= 0.3 and musicIntensity ~= "intense" then
+		-- Low health = intense music!
+		musicIntensity = "intense"
+		backgroundMusic.SoundId = MUSIC_TRACKS.intense
+		backgroundMusic.Volume = 0.25
+		backgroundMusic.PlaybackSpeed = 1.1  -- Slightly faster
+		print("Music intensity: INTENSE!")
+
+	elseif healthPercent > 0.3 and musicIntensity ~= "ambient" then
+		-- Normal health = ambient music
+		musicIntensity = "ambient"
+		backgroundMusic.SoundId = MUSIC_TRACKS.ambient
+		backgroundMusic.Volume = 0.15
+		backgroundMusic.PlaybackSpeed = 1.0
+		print("Music intensity: ambient")
+	end
+end
+
+-- Start background music
+createBackgroundMusic()
+
+-- Hook music intensity to health changes
+local originalUpdateHealthBar = updateHealthBar
+updateHealthBar = function(health, maxHp)
+	originalUpdateHealthBar(health, maxHp)
+	local healthPercent = math.clamp(health / maxHp, 0, 1)
+	updateMusicIntensity(healthPercent)
+end
+
+--[[
+	===========================================
+	PATH E: MULTI-KILL ANNOUNCER (E.7 & E.8)
+	===========================================
+
+	Tracks rapid kills and announces:
+	- Double Kill (2 kills in 3 seconds)
+	- Triple Kill (3 kills in 4 seconds)
+	- MEGA KILL (4 kills in 5 seconds)
+	- UNSTOPPABLE! (5+ kills in 6 seconds)
+
+	Just like classic FPS games!
+]]
+
+-- Multi-kill tracking
+local multiKillCount = 0
+local lastKillTime = 0
+local MULTI_KILL_WINDOW = 3  -- Seconds between kills to count as multi-kill
+
+-- Announcer sound IDs (English announcer voices)
+local ANNOUNCER_SOUNDS = {
+	doubleKill = "rbxassetid://2865227271",    -- "Double Kill"
+	tripleKill = "rbxassetid://2865227424",    -- "Triple Kill"
+	megaKill = "rbxassetid://2865227541",      -- "Mega Kill"
+	unstoppable = "rbxassetid://2865227689",   -- "Unstoppable"
+}
+
+-- Display text for multi-kills
+local MULTI_KILL_TEXT = {
+	[2] = { text = "DOUBLE KILL!", color = Color3.fromRGB(255, 200, 50) },
+	[3] = { text = "TRIPLE KILL!", color = Color3.fromRGB(255, 150, 0) },
+	[4] = { text = "MEGA KILL!", color = Color3.fromRGB(255, 100, 0) },
+	[5] = { text = "UNSTOPPABLE!", color = Color3.fromRGB(255, 50, 50) },
+}
+
+local function playAnnouncerSound(soundId)
+	local sound = Instance.new("Sound")
+	sound.SoundId = soundId
+	sound.Volume = 1.0
+	sound.Parent = player:WaitForChild("PlayerGui")
+	sound:Play()
+	sound.Ended:Connect(function()
+		sound:Destroy()
+	end)
+end
+
+local function showMultiKillPopup(killCount)
+	local killData = MULTI_KILL_TEXT[math.min(killCount, 5)]
+	if not killData then return end
+
+	local playerGui = player:WaitForChild("PlayerGui")
+
+	-- Create popup
+	local popup = Instance.new("ScreenGui")
+	popup.Name = "MultiKillPopup"
+	popup.DisplayOrder = 500
+	popup.Parent = playerGui
+
+	local label = Instance.new("TextLabel")
+	label.Size = UDim2.new(1, 0, 0, 80)
+	label.Position = UDim2.new(0, 0, 0.2, 0)
+	label.BackgroundTransparency = 1
+	label.Text = killData.text
+	label.TextColor3 = killData.color
+	label.TextSize = 48
+	label.Font = Enum.Font.GothamBold
+	label.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
+	label.TextStrokeTransparency = 0
+	label.Parent = popup
+
+	-- Scale up animation
+	label.TextSize = 20
+	local growTween = TweenService:Create(label, TweenInfo.new(0.2, Enum.EasingStyle.Back), {
+		TextSize = 48
+	})
+	growTween:Play()
+
+	-- Fade out after delay
+	task.delay(1.5, function()
+		local fadeOut = TweenService:Create(label, TweenInfo.new(0.5), {
+			TextTransparency = 1,
+			TextStrokeTransparency = 1
+		})
+		fadeOut:Play()
+		fadeOut.Completed:Connect(function()
+			popup:Destroy()
+		end)
+	end)
+end
+
+local function checkMultiKill()
+	local currentTime = tick()
+
+	-- Check if this kill is within the multi-kill window
+	if currentTime - lastKillTime <= MULTI_KILL_WINDOW then
+		multiKillCount = multiKillCount + 1
+	else
+		-- Too long since last kill, reset counter
+		multiKillCount = 1
+	end
+
+	lastKillTime = currentTime
+
+	-- Announce multi-kills!
+	if multiKillCount == 2 then
+		playAnnouncerSound(ANNOUNCER_SOUNDS.doubleKill)
+		showMultiKillPopup(2)
+		print("DOUBLE KILL!")
+	elseif multiKillCount == 3 then
+		playAnnouncerSound(ANNOUNCER_SOUNDS.tripleKill)
+		showMultiKillPopup(3)
+		print("TRIPLE KILL!")
+	elseif multiKillCount == 4 then
+		playAnnouncerSound(ANNOUNCER_SOUNDS.megaKill)
+		showMultiKillPopup(4)
+		print("MEGA KILL!")
+	elseif multiKillCount >= 5 then
+		playAnnouncerSound(ANNOUNCER_SOUNDS.unstoppable)
+		showMultiKillPopup(5)
+		print("UNSTOPPABLE!")
+	end
+end
+
+-- Hook multi-kill checking into the damage feedback system
+-- We need to check for kills when we receive damage info
+TargetHit.OnClientEvent:Connect(function(damageInfo)
+	if damageInfo and damageInfo.killed then
+		-- A zombie was killed! Check for multi-kill
+		checkMultiKill()
+	end
+end)
+
+print("===========================================")
+print("  PATH E: AUDIO SYSTEM ACTIVE!")
+print("  - Background music playing")
+print("  - Multi-kill announcer ready")
+print("  - Music intensifies at low health!")
+print("===========================================")
