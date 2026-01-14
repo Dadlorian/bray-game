@@ -104,16 +104,22 @@ This is the coolest feature in the game and I designed every part of it!
 
 ---
 
-### Level 7: Real NPCs (Current!)
-*"No more boring red squares!"*
+### Level 7: ZOMBIES!
+*"No more boring red squares - now they're UNDEAD!"*
 
 - [x] **Humanoid NPCs** - Real character models with heads, arms, legs
-- [x] **Faces** - They have the classic Roblox smile!
 - [x] **Walking AI** - NPCs patrol around using PathfindingService
 - [x] **Ragdoll Deaths** - Bodies fly apart when killed
 - [x] **Health Bars** - Green/Yellow/Red bar above their heads
 - [x] **Damage Numbers** - Floating numbers show how much damage you did
 - [x] **Headshot System** - 100 damage for headshots, less for body/limbs!
+- [x] **ZOMBIES!** - Transformed NPCs into scary zombies!
+  - Green rotting skin (5 different shades!)
+  - Scary zombie faces
+  - Tattered dirty clothes
+  - Slow shambling walk
+  - Zombie death sounds
+- [x] **"HEADSHOT!" Voice** - Announcer yells when you nail a headshot!
 
 **Damage Values I Set:**
 | Body Part | Damage |
@@ -123,7 +129,37 @@ This is the coolest feature in the game and I designed every part of it!
 | Arms | 30 |
 | Legs | 25 |
 
-**Skills Unlocked:** NPC creation, AI pathfinding, Humanoid system, Damage systems
+**Skills Unlocked:** NPC creation, AI pathfinding, Humanoid system, Damage systems, Sound design
+
+---
+
+### Level 8: The Great Wall (Current!)
+*"I designed my own fortress!"*
+
+This is MY vision for the ultimate zombie defense map!
+
+**The Great Wall:**
+- [x] **MASSIVE Wall** - 80 studs tall, 400 studs long!
+- [x] **Ancient Stone Bricks** - Looks like the Great Wall of China
+- [x] **Plain Design** - Simple and clean, just bricks
+- [x] **Destroyed Towers** - Two ruined towers at each end (LORE!)
+  - *What happened to the guards? The zombies know...*
+
+**The Sniper Tower:**
+- [x] **ONE Tall Tower** - 45 studs above the wall (125+ total height!)
+- [x] **Stone Construction** - Matches the ancient wall
+- [x] **Roof with Open Sides** - See in ALL directions!
+- [x] **Wooden Sniper Ledge** - Sticks out from the front!
+  - Support beams underneath
+  - COMPLETELY OPEN - look straight down at zombies!
+  - Side rails so you don't fall off
+
+**The Battlefield:**
+- [x] **Giant Forest** - 120 trees + 50 bushes on the danger side
+- [x] **Safe Zone** - Protected area behind the wall
+- [x] **Zombies Emerge** - They come from the forest toward YOUR wall!
+
+**Skills Unlocked:** Level design, Environmental storytelling, Architecture, Lore creation
 
 ---
 
@@ -149,14 +185,23 @@ Makes NPCs walk around obstacles intelligently.
 ### 6. Game Juice
 The little effects that make games FEEL good - screen shake, particles, sounds, flashes.
 
+### 7. Level Design
+Creating spaces that are fun to play in - sightlines, cover, atmosphere, and LORE!
+
+### 8. Environmental Storytelling
+The destroyed towers tell a story without any words. Players wonder: "What happened here?"
+
 ---
 
 ## What's Next?
 
-- [ ] Add real 3D target models from Toolbox
-- [ ] Build an environment (trees, rocks, buildings)
-- [ ] Add a sniper tower to shoot from
+- [x] ~~Add real 3D target models from Toolbox~~ → Made ZOMBIES instead!
+- [x] ~~Build an environment~~ → Giant forest with 120 trees!
+- [x] ~~Add a sniper tower~~ → Built the Great Wall with sniper tower!
+- [ ] Wave system (zombies come in harder waves)
+- [ ] More zombie types (fast zombies? tank zombies?)
 - [ ] Ambient sounds and atmosphere
+- [ ] Score leaderboard
 - [ ] Maybe multiplayer?
 
 ---

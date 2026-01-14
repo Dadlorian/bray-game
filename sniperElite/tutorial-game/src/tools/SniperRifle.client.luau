@@ -110,15 +110,31 @@ TargetHit.OnClientEvent:Connect(function(damageInfo)
 
 		-- Play extra sound for headshots
 		if damageInfo.isHeadshot then
-			-- Satisfying headshot sound (reuse hit sound but louder)
-			local headshotSound = Instance.new("Sound")
-			headshotSound.SoundId = "rbxassetid://166221646"
-			headshotSound.Volume = 1
-			headshotSound.PlaybackSpeed = 1.5  -- Higher pitch
-			headshotSound.Parent = player:WaitForChild("PlayerGui")
-			headshotSound:Play()
-			headshotSound.Ended:Connect(function()
-				headshotSound:Destroy()
+			-- Satisfying "ding" sound first
+			local headshotDing = Instance.new("Sound")
+			headshotDing.SoundId = "rbxassetid://166221646"
+			headshotDing.Volume = 0.8
+			headshotDing.PlaybackSpeed = 1.5  -- Higher pitch
+			headshotDing.Parent = player:WaitForChild("PlayerGui")
+			headshotDing:Play()
+			headshotDing.Ended:Connect(function()
+				headshotDing:Destroy()
+			end)
+
+			-- HEADSHOT VOICE! Says "HEADSHOT!" in a cool announcer voice
+			local headshotVoice = Instance.new("Sound")
+			headshotVoice.SoundId = "rbxassetid://616594208"  -- Classic "HEADSHOT!" announcer
+			headshotVoice.Volume = 1.2  -- Nice and loud!
+			headshotVoice.PlaybackSpeed = 1.0
+			headshotVoice.Parent = player:WaitForChild("PlayerGui")
+
+			-- Small delay so the ding plays first, then the voice
+			task.delay(0.1, function()
+				headshotVoice:Play()
+			end)
+
+			headshotVoice.Ended:Connect(function()
+				headshotVoice:Destroy()
 			end)
 		end
 	end

@@ -9,9 +9,10 @@
 
 ---
 
-## Current Status: Phase 1 Ready
-**Game State:** Working mini sniper game with basic Part targets
-**Next Step:** Learn the Toolbox to get professional 3D models
+## Current Status: THE GREAT WALL v4 COMPLETE! 🟢
+**Game State:** Epic zombie defense fortress with MASSIVE Great Wall, destroyed towers (lore!), and ultimate sniper perch!
+**Brayden's Level:** 8 - Level Design & Environmental Storytelling
+**Next Step:** Wave system, more zombie types, ambient sounds, or more lore!
 
 ---
 
@@ -214,7 +215,7 @@ Phase 1 (Toolbox) ──┬──> Phase 2 (Targets)
 - [x] Targets shootable (Part-based)
 - [x] Development board created with phases
 
-### Session 2026-01-13 (Brayden + Dad)
+### Session 2026-01-13 Morning (Brayden + Dad)
 - [x] Learned about Map function and Lerp (smooth transitions)
 - [x] Added scope sway/breathing system (Hold Shift = steady)
 - [x] Created visible sniper rifle model (Body, Barrel, Scope, etc.)
@@ -230,6 +231,100 @@ Phase 1 (Toolbox) ──┬──> Phase 2 (Targets)
 - [x] Created trusted GitHub repos document
 - [x] Learned about Toolbox safety (backdoors, trusted sources)
 
+### Session 2026-01-13 Afternoon (Brayden + Dad) - MASSIVE UPDATE!
+
+#### Bullet Cam Improvements
+- [x] Fixed timing - explosion waits until bullet arrives
+- [x] Cinematic zoomed-out camera (see bullet's whole journey)
+- [x] Target freezes in place during bullet cam
+- [x] Unzooms scope during bullet cam for better view
+- [x] Camera follows from side/behind at distance
+
+#### Humanoid NPCs (Replaced Square Targets!)
+- [x] Full humanoid characters (head, torso, arms, legs)
+- [x] Proper Motor6D joints for animations
+- [x] Faces on NPCs (classic Roblox smile)
+- [x] Patrol AI using PathfindingService
+- [x] NPCs walk around naturally
+
+#### Pro Damage System
+- [x] **Body part damage detection:**
+  - Head = 100 (instant kill!)
+  - Torso = 50
+  - Arms = 30
+  - Legs = 25
+- [x] Floating damage numbers (yellow, float up and fade)
+- [x] **HEADSHOT indicator** (red + skull emoji!)
+- [x] Health bars above NPCs (green → yellow → red)
+- [x] Headshot sound effect
+
+#### ZOMBIES! (Brayden's Dream Game!)
+- [x] Transformed NPCs into zombies
+- [x] Green rotting skin (5 different shades)
+- [x] Scary zombie faces
+- [x] Tattered dirty clothes
+- [x] Slower shambling walk speed
+- [x] Ragdoll death with green highlight
+- [x] Zombie death sounds
+
+#### Map Evolution - Brayden's Vision
+- [x] **v1:** Simple tower in center
+- [x] **v2:** Compound with walls, tower, surrounding forest
+- [x] **v3: BORDER WALL** (Brayden's final design!)
+  - Giant 300-stud wall dividing the map
+  - 35 studs tall, 25 studs THICK
+  - Battlements on top (can crouch behind!)
+  - End towers at each corner
+  - Sniper tower ON TOP of wall
+  - Forest on ONE SIDE only (danger side)
+  - 120 trees + 50 bushes
+  - Safe side behind wall
+  - Zombies emerge from forest toward wall!
+
+#### Project Organization
+- [x] Created **README.md** - Brayden's No-to-Pro Journey Log
+- [x] Set up Beacon to maintain journey log
+- [x] Repository made public for sharing with friends!
+- [x] **GitHub:** https://github.com/Dadlorian/bray-game
+
+### Session 2026-01-13 Evening (Brayden + Dad) - THE GREAT WALL!
+
+#### Great Wall Redesign (Brayden's Vision!)
+- [x] **v4: THE GREAT WALL** - Complete redesign!
+  - Wall height: 35 → **80 studs** (MASSIVE!)
+  - Wall length: 300 → **400 studs**
+  - Material: Concrete → **Ancient Stone Bricks**
+  - Style: Great Wall of China inspiration
+  - Removed battlements - **PLAIN design** (Brayden's choice!)
+  - Ground expanded to 500x600 studs
+
+#### Destroyed Towers (LORE!)
+- [x] Two ruined towers at each end of wall
+- [x] Broken/tilted stone pieces still standing
+- [x] Rubble scattered on the ground below
+- [x] Environmental storytelling: *"What happened to the other guards?"*
+
+#### Sniper Tower Upgrades
+- [x] Changed from wood to **stone construction**
+- [x] Matches the ancient wall aesthetic
+- [x] **Roof with open sides** - 4 corner posts, 12 studs of headroom
+- [x] See and shoot in ALL directions (front, left, right, back)
+- [x] **Wooden sniper ledge** sticking out from front!
+  - 3 support beams underneath
+  - Side rails only (won't fall off sides)
+  - **FRONT IS OPEN** - look straight down at zombies!
+- [x] Total tower height: **141 studs** from ground!
+
+#### Audio Upgrade
+- [x] **"HEADSHOT!" announcer voice** - plays when you nail a headshot!
+- [x] Classic FPS announcer style
+- [x] Plays after the satisfying "ding" sound
+
+#### Journey Log Updated
+- [x] README.md updated to **Level 8: The Great Wall**
+- [x] Added new skills: Level Design, Environmental Storytelling, Architecture, Lore Creation
+- [x] Updated "What's Next" with new goals
+
 ---
 
 ## Notes
@@ -240,3 +335,9 @@ Phase 1 (Toolbox) ──┬──> Phase 2 (Targets)
 - 🟢 = go for it, 🟡 = be ready to troubleshoot, 🔴 = ask for help
 - If something breaks, undo and try again
 - Have fun!
+
+**Brayden's Dream Game Realized!**
+- Started with simple red squares
+- Now has full zombie defense with border wall
+- Designed the bullet cam himself!
+- Designed the border wall layout himself!

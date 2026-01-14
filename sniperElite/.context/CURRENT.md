@@ -1,55 +1,118 @@
 # Current Session
 
 ## Status
-**Session:** 2026-01-13
-**Focus:** Added Pro Sniper Features + Brayden's Custom Bullet Cam
+**Session:** 2026-01-13 (Evening)
+**Focus:** THE GREAT WALL - Brayden's Ultimate Fortress!
 
 ## Where We Are
-- Sniper game has MAJOR upgrades!
-- Custom bullet cam designed by Brayden
-- Points system working
-- All code in `tutorial-game/src/tools/SniperRifle.client.luau`
+- **LEVEL 8 UNLOCKED: The Great Wall!**
+- Redesigned entire wall to Great Wall of China style
+- MASSIVE 80-stud tall ancient stone wall
+- Destroyed towers at ends (LORE!)
+- Sniper tower with roof and wooden ledge
+- "HEADSHOT!" announcer voice
+
+## Brayden's Journey Progress
+
+### Level 1-6: COMPLETE
+- Basic scripting → Raycasting → Sniper features → Game juice → Bullet cam → Points
+
+### Level 7: ZOMBIES - COMPLETE
+- Green zombie NPCs with patrol AI
+- Damage system with headshots
+- Health bars and damage numbers
+
+### Level 8: THE GREAT WALL - COMPLETE (Today!)
+- Designed his own fortress from scratch
+- Made creative decisions about style and features
+- Added environmental storytelling (ruined towers = lore!)
 
 ## What We Built This Session
 
-### Features Added:
-1. **Lerp (Linear Interpolation)** - Smooth transitions
-2. **Scope Sway/Breathing** - Hold Shift to steady (8 sec breath)
-3. **Visible Sniper Rifle** - Full gun model with parts
-4. **Bullet Tracer** - See bullets fly
-5. **Muzzle Flash** - With light effect
-6. **Screen Shake** - Recoil feel
-7. **Points System** - Tracks score at top of screen
-8. **Kill Confirmation** - Popup showing distance + points
+### Great Wall Redesign
+- **Height:** 35 → 80 studs (MASSIVE!)
+- **Length:** 300 → 400 studs
+- **Material:** Concrete → Ancient Stone Bricks
+- **Style:** Removed battlements, kept it PLAIN like Great Wall of China
+- **Ground:** Expanded to 500x600 studs total
 
-### Brayden's Custom Bullet Cam (100+ stud shots):
-- Chase camera (behind bullet)
-- Super slow speed (dramatic)
-- Triple trails: Fire + Smoke + Glow
-- Time freeze on impact (0.3 sec pause)
-- Sparks flying out
-- Big explosion effect
+### Destroyed Towers (Lore!)
+- Two ruined towers at each end of the wall
+- Broken/tilted stone pieces
+- Rubble scattered on the ground
+- Tells a story: "What happened to the other guards?"
 
-## Next Session - Pick Up Here:
-1. Test all the new features in game
-2. Adjust bullet cam if needed
-3. Continue Phase 1 (Toolbox exploration)
-4. Add real target models from Toolbox
+### Sniper Tower Upgrades
+- **Stone construction** matching the ancient wall
+- **Roof with open sides** - see in ALL directions
+- **Corner posts** holding up the roof (12 studs of headroom!)
+- **Wooden sniper ledge** sticking out from the front
+  - Support beams underneath
+  - Side rails only
+  - FRONT IS OPEN - look straight down!
 
-## Files Changed:
-- `tutorial-game/src/tools/SniperRifle.client.luau` - All features
-- `tutorial-game/default.project.json` - Tool Handle
-- `.context/details/2026-01-12-trusted-github-repositories.md` - New doc
+### Audio
+- **"HEADSHOT!" announcer voice** when you nail a headshot
+- Plays after the satisfying "ding" sound
 
-## What Brayden Learned:
-- Map function (converting ranges)
-- Lerp (smooth movement)
-- "Game juice" (pro developer effects)
-- How to design like a game dev (answered bullet cam questions)
-- Toolbox safety + trusted GitHub sources
+## Game Features Summary
+
+| Feature | Status |
+|---------|--------|
+| Sniper rifle with zoom | ✅ |
+| Scope sway + hold breath | ✅ |
+| Bullet cam (100+ studs) | ✅ |
+| Damage numbers | ✅ |
+| Health bars | ✅ |
+| Headshot system | ✅ |
+| "HEADSHOT!" voice | ✅ NEW! |
+| Zombie NPCs | ✅ |
+| Great Wall (80 studs!) | ✅ NEW! |
+| Destroyed towers (lore) | ✅ NEW! |
+| Sniper roof | ✅ NEW! |
+| Wooden sniper ledge | ✅ NEW! |
+| Forest environment | ✅ |
+| Spawn on tower | ✅ |
+
+## Skills Brayden Has Unlocked
+
+| Skill | Level Learned |
+|-------|---------------|
+| Basic Lua | 1 |
+| Raycasting | 2 |
+| Camera manipulation | 3 |
+| UI design | 3 |
+| 3D modeling with code | 4 |
+| Visual effects (Lerp) | 4 |
+| Game design | 5 |
+| Cinematic cameras | 5 |
+| Math (distance calc) | 6 |
+| NPC creation | 7 |
+| AI pathfinding | 7 |
+| Damage systems | 7 |
+| Sound design | 7 |
+| **Level design** | 8 |
+| **Environmental storytelling** | 8 |
+| **Architecture** | 8 |
+| **Lore creation** | 8 |
+
+## Next Session Ideas
+- Wave system (increasing difficulty)
+- More zombie types (fast? tank? crawler?)
+- Ambient sounds (forest, wind, zombie moans)
+- Score leaderboard
+- More lore elements?
+
+## Files Changed This Session
+- `tutorial-game/src/server/init.server.luau` - Great Wall redesign, destroyed towers, sniper ledge
+- `tutorial-game/src/tools/SniperRifle.client.luau` - HEADSHOT voice
+- `README.md` - Updated journey log to Level 8
 
 ## Quick Commands
 ```
 serve     - Start Rojo server
 board     - See development board
 ```
+
+## Share Link
+**https://github.com/Dadlorian/bray-game/tree/main/sniperElite**
