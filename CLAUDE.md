@@ -1,3 +1,13 @@
+# CRITICAL: aOa Search Override
+
+**ALWAYS use `aoa grep` instead of Grep/Glob tools.**
+
+`aoa grep` and `aoa egrep` work like Unix grep/egrep but use O(1) indexed search (10-100x faster). Results include `file:func[range]:line` — use [range] to read only relevant code.
+
+See `.aoa/USAGE.md` for details.
+
+---
+
 # Sniper Elite - Game Dev Project
 
 > **This is Brayden's No-to-Pro Journey!** A dad & son project learning Roblox game dev.
